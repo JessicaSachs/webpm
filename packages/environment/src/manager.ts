@@ -64,7 +64,7 @@ export class EnvironmentManager {
   /**
    * Get an environment variable as a number
    */
-  getNumber(key: string, defaultValue?: number): number | undefined {
+  getNumber(key: string, defaultValue: number): number {
     const value = this.get(key)
     if (!value) return defaultValue
 
@@ -81,7 +81,7 @@ export class EnvironmentManager {
   /**
    * Get an environment variable as a boolean
    */
-  getBoolean(key: string, defaultValue?: boolean): boolean | undefined {
+  getBoolean(key: string, defaultValue: boolean): boolean {
     const value = this.get(key)
     if (!value) return defaultValue
 
@@ -101,9 +101,9 @@ export class EnvironmentManager {
   /**
    * Get an environment variable as an array (comma-separated)
    */
-  getArray(key: string, defaultValue?: string[]): string[] | undefined {
+  getArray(key: string, defaultValue: string[] = []): string[] {
     const value = this.get(key)
-    if (!value) return defaultValue
+    if (!value) return defaultValue ?? []
 
     return value
       .split(',')

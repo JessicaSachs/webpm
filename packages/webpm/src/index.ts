@@ -84,7 +84,7 @@ interface NpmRegistryResponse {
   >
 }
 
-// Configure environment for webpm
+// Configure environment for webpm with environment-specific overrides
 env.updateConfig({
   prefix: 'WEBPM_',
   defaults: {
@@ -104,6 +104,18 @@ const DEFAULT_CONFIG: WebpmConfig = {
   retries: env.getNumber('RETRIES', 3),
   timeout: env.getNumber('TIMEOUT', 30000),
 }
+
+// Log the environment configuration being used
+logger.debug('WebPM environment configuration', {
+  environment: env.getEnvironment(),
+  config: {
+    registry: DEFAULT_CONFIG.registry,
+    cache: DEFAULT_CONFIG.cache,
+    concurrency: DEFAULT_CONFIG.concurrency,
+    retries: DEFAULT_CONFIG.retries,
+    timeout: DEFAULT_CONFIG.timeout,
+  },
+})
 
 /**
  * WebPM - Web Package Manager
@@ -284,11 +296,55 @@ export class WebPM {
   }
 
   /**
+   * Update environment configuration and refresh the config
+   * @param envConfig - Environment configuration to update
+   */
+  updateEnvironmentConfig(
+    envConfig: Parameters<typeof env.updateConfig>[0]
+  ): void {
+    env.updateConfig(envConfig)
+
+    // Refresh the configuration from environment variables
+    this.config = {
+      registry: env.get('REGISTRY', 'https://registry.npmjs.org')!,
+      cache: env.getBoolean('CACHE', true)!,
+      concurrency: env.getNumber('CONCURRENCY', 5)!,
+      retries: env.getNumber('RETRIES', 3)!,
+      timeout: env.getNumber('TIMEOUT', 30000)!,
+    }
+
+    logger.info('Environment configuration updated and config refreshed', {
+      config: this.config,
+      environment: env.getEnvironment(),
+    })
+  }
+
+  /**
    * Get current configuration
    * @returns Current configuration object
    */
   getConfig(): WebpmConfig {
     return { ...this.config }
+  }
+
+  /**
+   * Get current environment information
+   * @returns Environment information
+   */
+  getEnvironmentInfo(): {
+    environment: string
+    isDevelopment: boolean
+    isProduction: boolean
+    isTest: boolean
+    envConfig: ReturnType<typeof env.getConfig>
+  } {
+    return {
+      environment: env.getEnvironment(),
+      isDevelopment: env.isDevelopment(),
+      isProduction: env.isProduction(),
+      isTest: env.isTest(),
+      envConfig: env.getConfig(),
+    }
   }
 
   /**
