@@ -1,0 +1,57 @@
+{
+  "name": "@webpm/ui",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "sideEffects": false,
+  "files": [
+    "dist/**",
+    "dist"
+  ],
+  "exports": {
+    "./counter-button": {
+      "import": {
+        "types": "./dist/es/counter-button.d.mts",
+        "default": "./dist/es/counter-button.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/counter-button.d.ts",
+        "default": "./dist/cjs/counter-button.js"
+      }
+    },
+    "./link": {
+      "import": {
+        "types": "./dist/es/link.d.mts",
+        "default": "./dist/es/link.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/link.d.ts",
+        "default": "./dist/cjs/link.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "bunchee --no-external",
+    "dev": "bunchee --watch --no-external",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest --project ui"
+  },
+  "devDependencies": {
+    "@webpm/eslint-config": "workspace:*",
+    "@webpm/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "bunchee": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@vitest/ui": "catalog:",
+    "happy-dom": "catalog:"
+  },
+  "peerDependencies": {
+    "@types/react": ">=18",
+    "@types/react-dom": ">=18",
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
+}

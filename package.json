@@ -1,0 +1,28 @@
+{
+  "name": "kitchen-sink",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "clean": "turbo run clean",
+    "dev": "turbo run dev",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,vue,json,md,yml,yaml}\"",
+    "lint": "turbo run lint",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest --watch",
+    "check-types": "turbo run check-types"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "catalog:",
+    "@vitest/ui": "catalog:",
+    "prettier": "catalog:",
+    "turbo": "catalog:",
+    "vitest": "catalog:"
+  },
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=18"
+  }
+}

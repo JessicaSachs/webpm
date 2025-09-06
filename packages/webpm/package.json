@@ -1,0 +1,47 @@
+{
+  "name": "@webpm/webpm",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/es/index.js",
+  "module": "./dist/es/index.js",
+  "types": "./dist/es/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/es/index.d.ts",
+        "default": "./dist/es/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.cts",
+        "default": "./dist/cjs/index.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "bunchee --no-external",
+    "dev": "bunchee --watch --no-external",
+    "lint": "eslint src/",
+    "check-types": "tsc --noEmit",
+    "test": "vitest --project registry"
+  },
+  "devDependencies": {
+    "@webpm/eslint-config": "workspace:*",
+    "@webpm/typescript-config": "workspace:*",
+    "@webpm/logger": "workspace:*",
+    "@types/node": "catalog:",
+    "bunchee": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "browserslist": [
+    "last 1 version",
+    "> 1%",
+    "maintained node versions",
+    "not dead"
+  ]
+}
