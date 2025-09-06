@@ -2,22 +2,7 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    projects: [
-      // Node.js packages
-      'packages/logger',
-      'packages/registry',
-      // Browser/React packages with inline configuration
-      {
-        test: {
-          name: 'ui',
-          include: [
-            'packages/ui/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
-          ],
-          environment: 'happy-dom',
-          globals: true,
-        },
-      },
-    ],
+    projects: ['packages/*'],
     // Global configuration that applies to all projects
     reporters: ['verbose'],
     coverage: {

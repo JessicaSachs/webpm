@@ -1,4 +1,5 @@
 import { logger } from '@webpm/logger'
+import { env } from '@webpm/environment'
 
 // Core types and interfaces
 export interface PackageInfo {
@@ -83,13 +84,25 @@ interface NpmRegistryResponse {
   >
 }
 
-// Default configuration
+// Configure environment for webpm
+env.updateConfig({
+  prefix: 'WEBPM_',
+  defaults: {
+    REGISTRY: 'https://registry.npmjs.org',
+    CACHE: 'true',
+    CONCURRENCY: '5',
+    RETRIES: '3',
+    TIMEOUT: '30000',
+  },
+})
+
+// Default configuration with environment variable support
 const DEFAULT_CONFIG: WebpmConfig = {
-  registry: 'https://registry.npmjs.org',
-  cache: true,
-  concurrency: 5,
-  retries: 3,
-  timeout: 30000,
+  registry: env.get('REGISTRY', 'https://registry.npmjs.org'),
+  cache: env.getBoolean('CACHE', true),
+  concurrency: env.getNumber('CONCURRENCY', 5),
+  retries: env.getNumber('RETRIES', 3),
+  timeout: env.getNumber('TIMEOUT', 30000),
 }
 
 /**

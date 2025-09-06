@@ -29,6 +29,7 @@
     "test": "vitest --project logger"
   },
   "dependencies": {
+    "@webpm/environment": "workspace:*",
     "consola": "^3.4.2"
   },
   "devDependencies": {

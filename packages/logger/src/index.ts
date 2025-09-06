@@ -1,44 +1,23 @@
 import { consola, type ConsolaInstance, type LogLevel } from 'consola/browser'
+import { env, type Environment } from '@webpm/environment'
 
-// Universal environment detection
-const getEnvironment = (): string | undefined => {
-  // Try to detect environment in a universal way
-  if (typeof globalThis !== 'undefined' && globalThis.process?.env?.NODE_ENV) {
-    return globalThis.process.env.NODE_ENV
-  }
-  
-  // Check for common environment indicators in browser
-  if (typeof window !== 'undefined') {
-    // Browser environment - could check for build-time variables
-    const windowWithEnv = window as typeof window & { __ENV__?: string }
-    return windowWithEnv.__ENV__ || undefined
-  }
-  
-  return undefined
-}
+// Logger-specific environment configuration
+const loggerEnv = env
+
+// Configure logger environment with specific defaults
+loggerEnv.updateConfig({
+  prefix: 'WEBPM_',
+  defaults: {
+    LOG_LEVEL: '3', // Default to info level
+    LOG_FORMAT: 'pretty',
+  },
+})
 
 const getLogLevelFromEnv = (): LogLevel | undefined => {
-  // Try to get LOG_LEVEL in a universal way
-  if (typeof globalThis !== 'undefined' && globalThis.process?.env?.LOG_LEVEL) {
-    const logLevel = globalThis.process.env.LOG_LEVEL
-    const level = parseInt(logLevel, 10)
-    if (!isNaN(level) && level >= 0 && level <= 5) {
-      return level as LogLevel
-    }
+  const logLevel = loggerEnv.getNumber('LOG_LEVEL')
+  if (logLevel !== undefined && logLevel >= 0 && logLevel <= 5) {
+    return logLevel as LogLevel
   }
-  
-  // Check for browser environment variables
-  if (typeof window !== 'undefined') {
-    const windowWithLogLevel = window as typeof window & { __LOG_LEVEL__?: string }
-    const logLevel = windowWithLogLevel.__LOG_LEVEL__
-    if (logLevel) {
-      const level = parseInt(logLevel, 10)
-      if (!isNaN(level) && level >= 0 && level <= 5) {
-        return level as LogLevel
-      }
-    }
-  }
-  
   return undefined
 }
 
@@ -56,10 +35,10 @@ const getLogLevel = (): LogLevel => {
   }
 
   // Check global environment configuration
-  const env = globalConfig.environment || getEnvironment()
+  const environment = globalConfig.environment || loggerEnv.getEnvironment()
 
   // Default levels based on environment
-  switch (env) {
+  switch (environment) {
     case 'production':
       return 2 // Only warn and error
     case 'test':
@@ -71,7 +50,7 @@ const getLogLevel = (): LogLevel => {
 
 // Global logger configuration
 interface GlobalLoggerConfig {
-  environment?: string
+  environment?: Environment
   logLevel?: LogLevel
 }
 

@@ -52,7 +52,7 @@ catalogs:
       specifier: 18.0.1
       version: 18.0.1
     prettier:
-      specifier: ^3.6.0
+      specifier: ^3.6.2
       version: 3.6.2
     turbo:
       specifier: ^2.5.6
@@ -156,8 +156,35 @@ importers:
 
   packages/config-typescript: {}
 
+  packages/environment:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.3.1
+      '@webpm/eslint-config':
+        specifier: workspace:*
+        version: link:../config-eslint
+      '@webpm/typescript-config':
+        specifier: workspace:*
+        version: link:../config-typescript
+      bunchee:
+        specifier: 'catalog:'
+        version: 6.6.0(typescript@5.9.2)
+      eslint:
+        specifier: 'catalog:'
+        version: 9.35.0
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/node@24.3.1)(@vitest/ui@3.2.4)(happy-dom@18.0.1)
+
   packages/logger:
     dependencies:
+      '@webpm/environment':
+        specifier: workspace:*
+        version: link:../environment
       consola:
         specifier: ^3.4.2
         version: 3.4.2
@@ -228,6 +255,13 @@ importers:
         version: 3.2.4(@types/node@24.3.1)(@vitest/ui@3.2.4)(happy-dom@18.0.1)
 
   packages/webpm:
+    dependencies:
+      '@webpm/environment':
+        specifier: workspace:*
+        version: link:../environment
+      '@webpm/logger':
+        specifier: workspace:*
+        version: link:../logger
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -235,9 +269,6 @@ importers:
       '@webpm/eslint-config':
         specifier: workspace:*
         version: link:../config-eslint
-      '@webpm/logger':
-        specifier: workspace:*
-        version: link:../logger
       '@webpm/typescript-config':
         specifier: workspace:*
         version: link:../config-typescript
@@ -2116,6 +2147,10 @@ packages:
     resolution: {integrity: sha512-tX5e7OM1HnYr2+a2C/4V0htOcSQcoSTH9KgJnVvNm5zm/cyEWKJ7j7YutsH9CxMdtOkkLFy2AHrMci9IM8IPZQ==}
     engines: {node: '>=12.0.0'}
 
+  tinyglobby@0.2.15:
+    resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
+    engines: {node: '>=12.0.0'}
+
   tinypool@1.1.1:
     resolution: {integrity: sha512-Zba82s87IFq9A9XmjiX5uZA/ARWDrB03OHlq+Vw1fSdt0I+4/Kutwy8BP4Y/y/aORMo61FQ0vIb5j44vSo5Pkg==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -2935,7 +2970,7 @@ snapshots:
       flatted: 3.3.3
       pathe: 2.0.3
       sirv: 3.0.2
-      tinyglobby: 0.2.14
+      tinyglobby: 0.2.15
       tinyrainbow: 2.0.0
       vitest: 3.2.4(@types/node@24.3.1)(@vitest/ui@3.2.4)(happy-dom@18.0.1)
 
@@ -4395,6 +4430,11 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.3)
       picomatch: 4.0.3
 
+  tinyglobby@0.2.15:
+    dependencies:
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
+
   tinypool@1.1.1: {}
 
   tinyrainbow@2.0.0: {}
@@ -4557,7 +4597,7 @@ snapshots:
       std-env: 3.9.0
       tinybench: 2.9.0
       tinyexec: 0.3.2
-      tinyglobby: 0.2.14
+      tinyglobby: 0.2.15
       tinypool: 1.1.1
       tinyrainbow: 2.0.0
       vite: 7.1.4(@types/node@24.3.1)

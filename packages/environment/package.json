@@ -1,5 +1,5 @@
 {
-  "name": "@webpm/webpm",
+  "name": "@webpm/environment",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -26,11 +26,7 @@
     "dev": "bunchee --watch --no-external",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "test": "vitest --project registry"
-  },
-  "dependencies": {
-    "@webpm/environment": "workspace:*",
-    "@webpm/logger": "workspace:*"
+    "test": "vitest"
   },
   "devDependencies": {
     "@webpm/eslint-config": "workspace:*",
