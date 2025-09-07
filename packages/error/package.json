@@ -1,5 +1,5 @@
 {
-  "name": "@webpm/utils",
+  "name": "@webpm/error",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -29,15 +29,13 @@
     "test": "vitest"
   },
   "dependencies": {
-    "memoize": "^10.1.0",
-    "parse-npm-tarball-url": "^3.0.0",
-    "version-selector-type": "^3.0.0"
+    
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@webpm/eslint-config": "workspace:*",
-    "@webpm/types": "workspace:*",
     "@webpm/typescript-config": "workspace:*",
+    "@webpm/types": "workspace:*",
     "bunchee": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",

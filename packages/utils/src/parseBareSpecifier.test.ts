@@ -1,16 +1,145 @@
 import { describe, it, expect } from 'vitest'
-import { parseBareSpecifier, normalizeSpecifier } from './parseBareSpecifier'
-import type { RawSpecifier } from '@webpm/types'
+import {
+  parseBareSpecifier,
+  normalizeSpecifier,
+  defaultTagForAlias,
+} from './parseBareSpecifier'
 
-describe.todo('normalizeSpecifier', () => {
-  it('should return the raw specifier unchanged', () => {
-    const specifier: RawSpecifier = 'react@^18.0.0'
-    expect(normalizeSpecifier(specifier)).toBe(specifier)
+describe('normalizeSpecifier', () => {
+  const defaultTag = 'latest'
+  const registry = 'https://registry.npmjs.org/'
+
+  it('should parse raw specifier with alias', () => {
+    const result = normalizeSpecifier({
+      registry,
+      defaultTag,
+      alias: 'react',
+      rawSpecifier: '^18.0.0',
+    })
+
+    expect(result).toEqual({
+      type: 'range',
+      name: 'react',
+      fetchSpec: '>=18.0.0 <19.0.0-0',
+    })
   })
 
-  it('should handle empty string', () => {
-    const specifier: RawSpecifier = ''
-    expect(normalizeSpecifier(specifier)).toBe('')
+  it('should parse npm: prefixed specifier', () => {
+    const result = normalizeSpecifier({
+      registry,
+      defaultTag,
+      alias: 'my-alias',
+      rawSpecifier: 'npm:react@^18.0.0',
+    })
+
+    expect(result).toEqual({
+      type: 'range',
+      name: 'react',
+      fetchSpec: '>=18.0.0 <19.0.0-0',
+    })
+  })
+
+  it('should return default tag for alias when no raw specifier', () => {
+    const result = normalizeSpecifier({
+      registry,
+      defaultTag,
+      alias: 'react',
+      rawSpecifier: '',
+    })
+
+    expect(result).toEqual({
+      type: 'tag',
+      name: 'react',
+      fetchSpec: 'latest',
+    })
+  })
+
+  it('should handle empty raw specifier', () => {
+    const result = normalizeSpecifier({
+      registry,
+      defaultTag,
+      alias: 'test-package',
+      rawSpecifier: '',
+    })
+
+    expect(result).toEqual({
+      type: 'tag',
+      name: 'test-package',
+      fetchSpec: 'latest',
+    })
+  })
+
+  it('should handle custom default tag', () => {
+    const customTag = 'beta'
+    const result = normalizeSpecifier({
+      registry,
+      defaultTag: customTag,
+      alias: 'react',
+      rawSpecifier: '',
+    })
+
+    expect(result).toEqual({
+      type: 'tag',
+      name: 'react',
+      fetchSpec: 'beta',
+    })
+  })
+
+  it('should handle scoped package alias', () => {
+    const result = normalizeSpecifier({
+      registry,
+      defaultTag,
+      alias: '@types/node',
+      rawSpecifier: '^20.0.0',
+    })
+
+    expect(result).toEqual({
+      type: 'range',
+      name: '@types/node',
+      fetchSpec: '>=20.0.0 <21.0.0-0',
+    })
+  })
+})
+
+describe('defaultTagForAlias', () => {
+  it('should return tag type with default tag for alias', () => {
+    const result = defaultTagForAlias('react', 'latest')
+
+    expect(result).toEqual({
+      type: 'tag',
+      name: 'react',
+      fetchSpec: 'latest',
+    })
+  })
+
+  it('should handle custom default tag', () => {
+    const result = defaultTagForAlias('react', 'beta')
+
+    expect(result).toEqual({
+      type: 'tag',
+      name: 'react',
+      fetchSpec: 'beta',
+    })
+  })
+
+  it('should handle scoped package alias', () => {
+    const result = defaultTagForAlias('@types/node', 'latest')
+
+    expect(result).toEqual({
+      type: 'tag',
+      name: '@types/node',
+      fetchSpec: 'latest',
+    })
+  })
+
+  it('should handle empty alias', () => {
+    const result = defaultTagForAlias('', 'latest')
+
+    expect(result).toEqual({
+      type: 'tag',
+      name: '',
+      fetchSpec: 'latest',
+    })
   })
 })
 

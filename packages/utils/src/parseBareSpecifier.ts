@@ -1,20 +1,9 @@
-import type { RawSpecifier } from '@webpm/types'
+import type {
+  NormalizeSpecifierOptions,
+  RegistryPackageSpecifier,
+} from '@webpm/types'
 import parseNpmTarballUrl from 'parse-npm-tarball-url'
 import getVersionSelectorType from 'version-selector-type'
-export interface NormalizeSpecifierOptions {
-  registry: string
-  defaultTag: string
-  alias: string
-  rawSpecifier: RawSpecifier
-}
-
-export type RegistryPackageSpecifierType = 'tag' | 'version' | 'range'
-export interface RegistryPackageSpecifier {
-  type: RegistryPackageSpecifierType
-  name: string
-  fetchSpec: string
-  normalizedBareSpecifier?: string // Tarball URL
-}
 
 export function normalizeSpecifier({
   registry,

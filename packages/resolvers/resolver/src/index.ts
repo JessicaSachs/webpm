@@ -1,7 +1,8 @@
 /**
  * @webpm/resolver - Dependency resolver for browser environments.
  */
-import { parseBareSpecifier } from '@webpm/utils'
+import { normalizeSpecifier } from '@webpm/utils'
+import { pickPackage } from './pickPackage'
 
 export function resolveFromNpm({
   alias,
@@ -10,10 +11,42 @@ export function resolveFromNpm({
   alias: string
   rawSpecifier: string
 }) {
-  return parseBareSpecifier(
-    rawSpecifier,
+  const spec = normalizeSpecifier({
+    registry: 'https://registry.npmjs.org',
+    defaultTag: 'latest',
     alias,
-    'latest',
-    'https://registry.npmjs.org'
+    rawSpecifier,
+  })
+
+  return pickPackage(
+    {
+      fetch: async (
+        pkgName: string,
+        registry: string,
+        authHeaderValue?: string
+      ) => {
+        const response = await fetch(`${registry}/${pkgName}`, {
+          headers: {
+            Authorization: authHeaderValue ?? '',
+          },
+        })
+        return response.json()
+      },
+      metaDir: 'meta',
+      metaCache: new Map(),
+      cacheDir: 'cache',
+      offline: false,
+      preferOffline: false,
+      filterMetadata: false,
+    },
+    spec,
+    {
+      publishedBy: new Date(),
+      preferredVersionSelectors: {},
+      registry: 'https://registry.npmjs.org',
+      dryRun: false,
+      updateToLatest: false,
+      authHeaderValue: undefined,
+    }
   )
 }
