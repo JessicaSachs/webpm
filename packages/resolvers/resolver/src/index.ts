@@ -1,10 +1,11 @@
 /**
  * @webpm/resolver - Dependency resolver for browser environments.
  */
-import { normalizeSpecifier } from '@webpm/utils'
+import { normalizeSpecifier, getIntegrity } from '@webpm/utils'
 import { LRUCache } from 'lru-cache'
 import { pickPackage } from './pickPackage'
-import type { PackageMeta, PackageMetaCache } from '@webpm/types'
+import type { PackageMeta, PkgResolutionId } from '@webpm/types'
+import { NoMatchingVersionError } from '@webpm/error'
 
 /**
  * Encode package name for URL (handles scoped packages)
@@ -72,7 +73,7 @@ const metaCache = new LRUCache<string, PackageMeta>({
   ttl: 120 * 1000, // 2 minutes
 })
 
-export function resolveFromNpm({
+export async function resolveFromNpm({
   alias,
   rawSpecifier,
 }: {
@@ -92,7 +93,7 @@ export function resolveFromNpm({
     )
   }
 
-  return pickPackage(
+  const pickPackageResult = await pickPackage(
     {
       fetch: enhancedFetch,
       metaDir: 'meta',
@@ -104,7 +105,7 @@ export function resolveFromNpm({
     },
     spec,
     {
-      publishedBy: new Date(),
+      publishedBy: undefined,
       preferredVersionSelectors: {},
       registry: 'https://registry.npmjs.org',
       dryRun: false,
@@ -112,6 +113,48 @@ export function resolveFromNpm({
       authHeaderValue: undefined,
     }
   )
+
+  const pickedPackage = pickPackageResult.pickedPackage
+  const meta = pickPackageResult.meta
+
+  if (pickedPackage == null) {
+    throw new NoMatchingVersionError({
+      wantedDependency: {
+        alias,
+        bareSpecifier: rawSpecifier,
+      },
+      packageMeta: meta,
+      registry: 'https://registry.npmjs.org',
+    })
+  }
+
+  const id = `${pickedPackage.name}@${pickedPackage.version}` as PkgResolutionId
+
+  debugger
+  const resolution = {
+    integrity: getIntegrity(pickedPackage.dist),
+    tarball: pickedPackage.dist.tarball,
+  }
+  // let normalizedBareSpecifier: string | undefined
+  // if (opts.calcSpecifier) {
+  //   normalizedBareSpecifier =
+  //     spec.normalizedBareSpecifier ??
+  //     calcSpecifier({
+  //       wantedDependency,
+  //       spec,
+  //       version: pickedPackage.version,
+  //       defaultPinnedVersion: opts.pinnedVersion,
+  //     })
+  // }
+  return {
+    id,
+    latest: meta['dist-tags'].latest,
+    manifest: pickedPackage,
+    resolution,
+    resolvedVia: 'npm-registry',
+    publishedAt: meta.time?.[pickedPackage.version],
+    normalizedBareSpecifier: spec.normalizedBareSpecifier,
+  }
 }
 
 /**

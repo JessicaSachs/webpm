@@ -22,6 +22,7 @@ export function pickPackageFromMeta(
   meta: PackageMeta,
   publishedBy?: Date
 ): PackageInRegistry | null {
+  debugger
   if (
     (!meta.versions || Object.keys(meta.versions).length === 0) &&
     !publishedBy
@@ -34,6 +35,7 @@ export function pickPackageFromMeta(
     throw new NoVersionsError(spec.name)
   }
   try {
+    debugger
     let version!: string | null
     switch (spec.type) {
       case 'version':

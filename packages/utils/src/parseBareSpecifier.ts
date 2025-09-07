@@ -5,6 +5,10 @@ import type {
 import parseNpmTarballUrl from 'parse-npm-tarball-url'
 import getVersionSelectorType from 'version-selector-type'
 
+export function toRaw(spec: RegistryPackageSpecifier): string {
+  return `${spec.name}@${spec.fetchSpec}`
+}
+
 export function normalizeSpecifier({
   registry,
   defaultTag,

@@ -10,15 +10,17 @@
     "lint": "eslint src/ --max-warnings 0"
   },
   "dependencies": {
-    "vue": "^3.5.21",
+    "@webpm/resolver": "workspace:*",
     "@webpm/webpm": "workspace:*",
-    "@webpm/resolver": "workspace:*"
+    "vue": "^3.5.21"
   },
   "devDependencies": {
+    "@vitejs/plugin-vue": "catalog:",
     "@webpm/eslint-config": "workspace:*",
     "@webpm/typescript-config": "workspace:*",
-    "@vitejs/plugin-vue": "catalog:",
     "eslint": "catalog:",
+    "rollup-plugin-natives": "^0.7.8",
+    "rollup-plugin-polyfill-node": "^0.13.0",
     "typescript": "catalog:",
     "vite": "catalog:"
   }

@@ -1,20 +1,28 @@
+import { promises as fs } from 'fs'
+import type {
+  RegistryPackageSpecifier as RegistryPackageSpec,
+  VersionSelectors,
+  PackageManifest,
+} from '@webpm/types'
+import { getRegistryName, toRaw } from '@webpm/utils'
 import path from 'pathe'
-// import { createHexHash } from '@pnpm/crypto.hash'
-import { NoOfflineMetaError, InvalidPackageNameError } from '@webpm/error'
+import { WebpmError as WebpmError } from '@webpm/error'
 import { logger } from '@webpm/logger'
 // import gfs from '@pnpm/graceful-fs'
-import {
-  type PackageManifest,
-  VersionSelectors,
-  RegistryPackageSpecifier,
-} from '@webpm/types'
-import { getRegistryName } from '@webpm/utils'
-import pLimit, { LimitFunction } from 'p-limit'
+// import loadJsonFile from 'load-json-file'
+import pLimit, { type LimitFunction } from 'p-limit'
 // import { fastPathTemp as pathTemp } from 'path-temp'
 import { pick } from 'lodash-es'
 import semver from 'semver'
 // import renameOverwrite from 'rename-overwrite'
-import { pickVersionByVersionRange } from './pickPackageFromMeta'
+import {
+  pickPackageFromMeta,
+  pickVersionByVersionRange,
+} from './pickPackageFromMeta'
+
+const loadJsonFile = async <T>(_path: string): Promise<T | null> => {
+  return null
+}
 
 export interface PackageMeta {
   name: string
@@ -89,9 +97,33 @@ export interface PickPackageOptions {
   authHeaderValue?: string
   publishedBy?: Date
   preferredVersionSelectors: VersionSelectors | undefined
+  pickLowestVersion?: boolean
   registry: string
   dryRun: boolean
   updateToLatest?: boolean
+}
+
+function pickPackageFromMetaUsingTime(
+  spec: RegistryPackageSpec,
+  preferredVersionSelectors: VersionSelectors | undefined,
+  meta: PackageMeta,
+  publishedBy?: Date
+): PackageInRegistry | null {
+  const pickedPackage = pickPackageFromMeta(
+    pickVersionByVersionRange,
+    spec,
+    preferredVersionSelectors,
+    meta,
+    publishedBy
+  )
+  if (pickedPackage) return pickedPackage
+  return pickPackageFromMeta(
+    pickLowestVersionByVersionRange,
+    spec,
+    preferredVersionSelectors,
+    meta,
+    publishedBy
+  )
 }
 
 export async function pickPackage(
@@ -108,16 +140,23 @@ export async function pickPackage(
     preferOffline?: boolean
     filterMetadata?: boolean
   },
-  spec: RegistryPackageSpecifier,
+  spec: RegistryPackageSpec,
   opts: PickPackageOptions
 ): Promise<{ meta: PackageMeta; pickedPackage: PackageInRegistry | null }> {
   opts = opts || {}
-  let _pickPackageFromMeta = pickVersionByVersionRange
+  let _pickPackageFromMeta = opts.publishedBy
+    ? pickPackageFromMetaUsingTime
+    : pickPackageFromMeta.bind(
+        null,
+        opts.pickLowestVersion
+          ? pickLowestVersionByVersionRange
+          : pickVersionByVersionRange
+      )
 
   if (opts.updateToLatest) {
     const _pickPackageBase = _pickPackageFromMeta
     _pickPackageFromMeta = (spec, ...rest) => {
-      const latestStableSpec: RegistryPackageSpecifier = {
+      const latestStableSpec: RegistryPackageSpec = {
         ...spec,
         type: 'tag',
         fetchSpec: 'latest',
@@ -157,7 +196,11 @@ export async function pickPackage(
 
   return runLimited(pkgMirror, async (limit) => {
     let metaCachedInStore: PackageMeta | null | undefined
-    if (ctx.offline === true || ctx.preferOffline === true) {
+    if (
+      ctx.offline === true ||
+      ctx.preferOffline === true ||
+      opts.pickLowestVersion
+    ) {
       metaCachedInStore = await limit(async () => loadMeta(pkgMirror))
 
       if (ctx.offline) {
@@ -172,7 +215,10 @@ export async function pickPackage(
             ),
           }
 
-        throw new NoOfflineMetaError(spec, pkgMirror)
+        throw new WebpmError(
+          'NO_OFFLINE_META',
+          `Failed to resolve ${toRaw(spec)} in package mirror ${pkgMirror}`
+        )
       }
 
       if (metaCachedInStore != null) {
@@ -233,9 +279,7 @@ export async function pickPackage(
       meta.cachedAt = Date.now()
       // only save meta to cache, when it is fresh
       ctx.metaCache.set(spec.name, meta)
-
-      // TODO: Implement storage
-      if (!opts.dryRun && false) {
+      if (!opts.dryRun) {
         // We stringify this meta here to avoid saving any mutations that could happen to the meta object.
         const stringifiedMeta = JSON.stringify(meta)
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -260,15 +304,12 @@ export async function pickPackage(
         ),
       }
     } catch (err: any) {
-      // TODO: Handle fallback from load meta from cache
-      return
-
       // eslint-disable-line
       err.spec = spec
       const meta = await loadMeta(pkgMirror) // TODO: add test for this usecase
       if (meta == null) throw err
       logger.error(err, err)
-      logger.debug({ message: `Using cached meta from ${pkgMirror}` })
+      logger.debug(`Using cached meta from ${pkgMirror}`)
       return {
         meta,
         pickedPackage: _pickPackageFromMeta(
@@ -323,29 +364,28 @@ function clearMeta(pkg: PackageMeta): PackageMeta {
 
 function encodePkgName(pkgName: string): string {
   if (pkgName !== pkgName.toLowerCase()) {
-    return `${pkgName}_${createHexHash(pkgName)}`
+    return `${pkgName}_${crypto.subtle.digest('SHA-256', new TextEncoder().encode(pkgName)).then((hash) => hash.toString())}`
   }
   return pkgName
 }
 
 async function loadMeta(pkgMirror: string): Promise<PackageMeta | null> {
   try {
-    logger.debug(pkgMirror)
-    // return await loadJsonFile<PackageMeta>(pkgMirror)
+    return await loadJsonFile<PackageMeta>(pkgMirror)
   } catch (err: any) {
     // eslint-disable-line
     return null
   }
 }
 
-// const createdDirs = new Set<string>()
+const createdDirs = new Set<string>()
 
 async function saveMeta(pkgMirror: string, meta: string): Promise<void> {
-  // const dir = path.dirname(pkgMirror)
-  // if (!createdDirs.has(dir)) {
-  //   await fs.mkdir(dir, { recursive: true })
-  //   createdDirs.add(dir)
-  // }
+  const dir = path.dirname(pkgMirror)
+  if (!createdDirs.has(dir)) {
+    // await fs.mkdir(dir, { recursive: true })
+    createdDirs.add(dir)
+  }
   // const temp = pathTemp(pkgMirror)
   // await gfs.writeFile(temp, meta)
   // await renameOverwrite(temp, pkgMirror)
@@ -353,6 +393,9 @@ async function saveMeta(pkgMirror: string, meta: string): Promise<void> {
 
 function validatePackageName(pkgName: string) {
   if (pkgName.includes('/') && pkgName[0] !== '@') {
-    throw new InvalidPackageNameError(pkgName)
+    throw new WebpmError(
+      'INVALID_PACKAGE_NAME',
+      `Package name ${pkgName} is invalid, it should have a @scope`
+    )
   }
 }
