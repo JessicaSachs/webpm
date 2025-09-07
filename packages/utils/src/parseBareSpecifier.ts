@@ -1,15 +1,41 @@
 import type { RawSpecifier } from '@webpm/types'
 import parseNpmTarballUrl from 'parse-npm-tarball-url'
 import getVersionSelectorType from 'version-selector-type'
-
-export function normalizeSpecifier(rawSpecifier: RawSpecifier) {
-  return rawSpecifier
+export interface NormalizeSpecifierOptions {
+  registry: string
+  defaultTag: string
+  alias: string
+  rawSpecifier: RawSpecifier
 }
-export interface RegistryPackageSpec {
-  type: 'tag' | 'version' | 'range'
+
+export type RegistryPackageSpecifierType = 'tag' | 'version' | 'range'
+export interface RegistryPackageSpecifier {
+  type: RegistryPackageSpecifierType
   name: string
   fetchSpec: string
-  normalizedBareSpecifier?: string
+  normalizedBareSpecifier?: string // Tarball URL
+}
+
+export function normalizeSpecifier({
+  registry,
+  defaultTag,
+  alias,
+  rawSpecifier,
+}: NormalizeSpecifierOptions) {
+  return rawSpecifier
+    ? parseBareSpecifier(rawSpecifier, alias, defaultTag, registry)
+    : defaultTagForAlias(alias, defaultTag)
+}
+
+export function defaultTagForAlias(
+  alias: string,
+  defaultTag: string
+): RegistryPackageSpecifier {
+  return {
+    fetchSpec: defaultTag,
+    name: alias,
+    type: 'tag',
+  }
 }
 
 export function parseBareSpecifier(
@@ -17,7 +43,7 @@ export function parseBareSpecifier(
   alias: string | undefined,
   defaultTag: string,
   registry: string
-): RegistryPackageSpec | null {
+): RegistryPackageSpecifier | null {
   let name = alias
   if (bareSpecifier.startsWith('npm:')) {
     bareSpecifier = bareSpecifier.slice(4)
@@ -37,7 +63,7 @@ export function parseBareSpecifier(
         fetchSpec: selector.normalized,
         name,
         type: selector.type,
-      }
+      } satisfies RegistryPackageSpecifier
     }
   }
   if (bareSpecifier.startsWith(registry)) {
@@ -48,7 +74,7 @@ export function parseBareSpecifier(
         name: pkg.name,
         normalizedBareSpecifier: bareSpecifier,
         type: 'version',
-      }
+      } satisfies RegistryPackageSpecifier
     }
   }
   return null
