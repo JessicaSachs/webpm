@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - packages/resolvers/*
 
 catalog:
   '@eslint/js': ^9.31.0

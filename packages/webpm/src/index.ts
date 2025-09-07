@@ -1,26 +1,7 @@
 import { logger } from '@webpm/logger'
 import { env } from '@webpm/environment'
-
-// Core types and interfaces
-export interface PackageInfo {
-  name: string
-  description: string
-  version: string
-  license: string
-  homepage?: string
-  repository?: {
-    type: string
-    url: string
-  }
-  keywords?: string[]
-  author?: {
-    name: string
-    email?: string
-  }
-  dependencies?: Record<string, string>
-  devDependencies?: Record<string, string>
-  peerDependencies?: Record<string, string>
-}
+import { NPMRegistry } from '@webpm/registry'
+import type { PackageMetadata } from '@webpm/registry'
 
 export interface PackageVersion {
   version: string
@@ -123,11 +104,19 @@ logger.debug('WebPM environment configuration', {
  */
 export class WebPM {
   private config: WebpmConfig
-  private cache = new Map<string, PackageInfo>()
+  private registry: NPMRegistry
 
   constructor(config: Partial<WebpmConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config }
-    logger.info('WebPM initialized', { config: this.config })
+    this.registry = new NPMRegistry({
+      ...this.config,
+    })
+  }
+
+  init(): Promise<void> {
+    return Promise.all([this.registry.init()]).then(([registry]) => {
+      logger.info('WebPM initialized', { config: this.config, registry })
+    })
   }
 
   /**
@@ -135,53 +124,24 @@ export class WebPM {
    * @param packageName - The name of the package to fetch
    * @returns Promise resolving to package information
    */
-  async getPackageInfo(packageName: string): Promise<PackageInfo> {
+  async getPackageInfo(packageName: string): Promise<PackageMetadata> {
     if (!packageName.trim()) {
       throw new Error('Package name cannot be empty')
     }
 
-    // Check cache first
-    if (this.config.cache && this.cache.has(packageName)) {
-      logger.debug('Package info found in cache', { packageName })
-      return this.cache.get(packageName)!
-    }
-
-    try {
-      const response = await this.fetchWithRetry(
-        `${this.config.registry}/${packageName}`
-      )
-      const data = (await response.json()) as NpmRegistryResponse
-
-      const packageInfo: PackageInfo = {
-        name: data.name,
-        description: data.description || 'No description available',
-        version: data['dist-tags']?.latest || 'unknown',
-        license: data.license || 'Unknown',
-        homepage: data.homepage,
-        repository: data.repository,
-        keywords: data.keywords,
-        author: data.author,
-        dependencies: data.versions?.[data['dist-tags']?.latest]?.dependencies,
-        devDependencies:
-          data.versions?.[data['dist-tags']?.latest]?.devDependencies,
-        peerDependencies:
-          data.versions?.[data['dist-tags']?.latest]?.peerDependencies,
-      }
-
-      // Cache the result
-      if (this.config.cache) {
-        this.cache.set(packageName, packageInfo)
-      }
-
-      logger.info('Package info fetched successfully', {
-        packageName,
-        version: packageInfo.version,
+    return this.registry
+      .getLatestVersion(packageName)
+      .then((metadata) => {
+        logger.info('Package info fetched successfully', {
+          packageName,
+          version: metadata.version,
+        })
+        return metadata
       })
-      return packageInfo
-    } catch (error) {
-      logger.error('Failed to fetch package info', { packageName, error })
-      throw error
-    }
+      .catch((error) => {
+        logger.error('Failed to fetch package info', { packageName, error })
+        throw error
+      })
   }
 
   /**
@@ -273,17 +233,11 @@ export class WebPM {
    * @param packageNames - Array of package names to fetch
    * @returns Promise resolving to array of package information
    */
-  async getMultiplePackages(packageNames: string[]): Promise<PackageInfo[]> {
+  async getMultiplePackages(
+    packageNames: string[]
+  ): Promise<PackageMetadata[]> {
     const promises = packageNames.map((name) => this.getPackageInfo(name))
     return Promise.all(promises)
-  }
-
-  /**
-   * Clear the package cache
-   */
-  clearCache(): void {
-    this.cache.clear()
-    logger.info('Package cache cleared')
   }
 
   /**

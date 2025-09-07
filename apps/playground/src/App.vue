@@ -14,6 +14,8 @@
         Vite
       </a>
     </p>
+
+    <SomeComponent />
     
     <div class="npm-fetcher">
       <h2>NPM Package Fetcher</h2>
@@ -70,40 +72,41 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-// import { webpm, type PackageInfo } from '@webpm/webpm';
-import '@webpm/webpm';
+import SomeComponent from './SomeComponent.vue';
+import { webpm, type PackageInfo } from '@webpm/webpm';
+
 // Reactive state
 const packageName = ref('');
-// const packageInfo = ref<PackageInfo | null>(null);
+const packageInfo = ref<PackageInfo | null>(null);
 const loading = ref(false);
 const error = ref('');
 
-// // Methods
-// const fetchPackageInfo = async () => {
-//   if (!packageName.value.trim()) {
-//     error.value = 'Please enter a package name';
-//     return;
-//   }
+// Methods
+const fetchPackageInfo = async () => {
+  if (!packageName.value.trim()) {
+    error.value = 'Please enter a package name';
+    return;
+  }
 
-//   // Clear previous results
-//   error.value = '';
-//   packageInfo.value = null;
-//   loading.value = true;
+  // Clear previous results
+  error.value = '';
+  packageInfo.value = null;
+  loading.value = true;
 
-//   try {
-//     // Validate package name format
-//     if (!webpm.validatePackageName(packageName.value)) {
-//       throw new Error('Invalid package name format');
-//     }
+  try {
+    // Validate package name format
+    if (!webpm.validatePackageName(packageName.value)) {
+      throw new Error('Invalid package name format');
+    }
 
-//     const result = await webpm.getPackageInfo(packageName.value);
-//     packageInfo.value = result;
-//   } catch (err) {
-//     error.value = err instanceof Error ? err.message : 'An unexpected error occurred';
-//   } finally {
-//     loading.value = false;
-//   }
-// };
+    const result = await webpm.getPackageInfo(packageName.value);
+    packageInfo.value = result;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'An unexpected error occurred';
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <style scoped>

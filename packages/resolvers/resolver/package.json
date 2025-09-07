@@ -1,5 +1,5 @@
 {
-  "name": "@webpm/logger",
+  "name": "@webpm/resolver",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -26,16 +26,21 @@
     "dev": "bunchee --watch --no-external",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "test": "vitest --project logger"
+    "test": "vitest"
   },
   "dependencies": {
+    "@webpm/utils": "workspace:*",
     "@webpm/environment": "workspace:*",
-    "consola": "^3.4.2"
+    "@webpm/logger": "workspace:*",
+    "semver": "7.7.2",
+    "ssri": "^12.0.0",
+    "version-selector-type": "^3.0.0"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
+    "@webpm/types": "workspace:*",
     "@webpm/eslint-config": "workspace:*",
     "@webpm/typescript-config": "workspace:*",
-    "@types/node": "catalog:",
     "bunchee": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",

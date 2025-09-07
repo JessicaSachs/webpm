@@ -26,11 +26,12 @@
     "dev": "bunchee --watch --no-external",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "test": "vitest --project registry"
+    "test": "vitest --project webpm"
   },
   "dependencies": {
     "@webpm/environment": "workspace:*",
-    "@webpm/logger": "workspace:*"
+    "@webpm/logger": "workspace:*",
+    "@webpm/registry": "workspace:*"
   },
   "devDependencies": {
     "@webpm/eslint-config": "workspace:*",
