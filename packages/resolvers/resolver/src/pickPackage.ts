@@ -330,7 +330,6 @@ function encodePkgName(pkgName: string): string {
 
 async function loadMeta(pkgMirror: string): Promise<PackageMeta | null> {
   try {
-    debugger
     logger.debug(pkgMirror)
     // return await loadJsonFile<PackageMeta>(pkgMirror)
   } catch (err: any) {

@@ -16,13 +16,14 @@ import { resolveFromNpm } from '@webpm/resolver';
 const alias = ref('vue');
 const rawSpecifier = ref('3.0.0');
 
-const result = ref<ReturnType<typeof resolveFromNpm> | null>(null)
+const result = ref<Awaited<ReturnType<typeof resolveFromNpm>> | null>(null)
 
-const resolve = () => {
-  result.value = resolveFromNpm({
+const resolve = async () => {
+  const ret = await resolveFromNpm({
     alias: alias.value,
     rawSpecifier: rawSpecifier.value,
   });
+  debugger;
 }
 </script>
 
