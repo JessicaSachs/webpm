@@ -13,10 +13,10 @@ export function normalizeSpecifier({
   registry,
   defaultTag,
   alias,
-  rawSpecifier,
+  bareSpecifier,
 }: NormalizeSpecifierOptions) {
-  return rawSpecifier
-    ? parseBareSpecifier(rawSpecifier, alias, defaultTag, registry)
+  return bareSpecifier
+    ? parseBareSpecifier(bareSpecifier, alias, defaultTag, registry)
     : defaultTagForAlias(alias, defaultTag)
 }
 

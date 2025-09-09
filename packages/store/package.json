@@ -1,5 +1,5 @@
 {
-  "name": "@webpm/resolver",
+  "name": "@webpm/store",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -26,31 +26,20 @@
     "dev": "bunchee --watch --no-external",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest --project logger"
   },
   "dependencies": {
     "@webpm/environment": "workspace:*",
-    "@webpm/error": "workspace:*",
     "@webpm/logger": "workspace:*",
-    "@webpm/utils": "workspace:*",
-    "encode-registry": "^3.0.1",
-    "lodash-es": "^4.17.21",
-    "lru-cache": "^11.2.1",
-    "npm-pick-manifest": "^10.0.0",
-    "p-limit": "^7.1.1",
-    "pathe": "^2.0.3",
-    "semver": "7.7.2",
-    "ssri": "^12.0.0",
-    "unstorage": "^1.17.1",
-    "version-selector-type": "^3.0.0"
+    "@webpm/registry": "workspace:*",
+    "consola": "^3.4.2",
+    "semver": "7.7.2"
   },
   "devDependencies": {
-    "@types/lodash-es": "^4.17.12",
-    "@types/node": "catalog:",
-    "@types/semver": "^7.7.1",
     "@webpm/eslint-config": "workspace:*",
-    "@webpm/types": "workspace:*",
     "@webpm/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/semver": "catalog:",
     "bunchee": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",

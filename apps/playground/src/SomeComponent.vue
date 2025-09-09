@@ -1,9 +1,9 @@
 <template>
   <div>
-    <h1>Some Component</h1>
-    <p>{{ alias }} {{ rawSpecifier }}</p>
+    <h1>Demo Component</h1>
+    <p>{{ alias }} {{ bareSpecifier }}</p>
     <input v-model="alias" />
-    <input v-model="rawSpecifier" />
+    <input v-model="bareSpecifier" />
     <button @click="resolve">Resolve</button>
     <pre>{{ result }}</pre>
   </div>
@@ -11,21 +11,20 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { resolveFromNpm } from '@webpm/resolver';
+import { webpm } from '@webpm/webpm';
 
 const alias = ref('vue');
-const rawSpecifier = ref('3.0.0');
+const bareSpecifier = ref('3.0.0');
 
-const result = ref<string>('')
+const result = ref('')
 
 const resolve = async () => {
-  const resolveResult = await resolveFromNpm({
-    alias: alias.value,
-    rawSpecifier: rawSpecifier.value,
+  const resolveResult = await webpm.install(alias.value, {
+    version: bareSpecifier.value,
   })
 
-  const manifest = resolveResult.manifest
-  result.value = JSON.stringify(manifest, null, 2)
+  // const manifest = resolveResult
+  result.value = JSON.stringify(resolveResult, null, 2)
 }
 </script>
 

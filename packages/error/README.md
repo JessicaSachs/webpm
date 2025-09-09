@@ -1,3 +1,3 @@
-# @webpm/resolver
+# @webpm/npm-resolver
 
 Dependency resolver for browser environments.

@@ -153,6 +153,8 @@ export async function pickPackage(
           : pickVersionByVersionRange
       )
 
+  debugger
+
   if (opts.updateToLatest) {
     const _pickPackageBase = _pickPackageFromMeta
     _pickPackageFromMeta = (spec, ...rest) => {

@@ -24,7 +24,7 @@
 //    "resolvedVia": "npm-registry"
 //  }
 
-export type RawSpecifier = string
+export type BareSpecifier = string
 export type Package = {
   name: string
   version: string
@@ -51,7 +51,7 @@ export type ResolvedVia = 'npm-registry'
 
 export type PackageResolution = {
   id: string // registry.npmjs.org/is-positive/1.0.0
-  latest: RawSpecifier
+  latest: BareSpecifier
   package: Package
   resolution: Resolution
   resolvedVia: ResolvedVia
@@ -524,8 +524,8 @@ export type ProjectRootDirRealPath = string & {
 export interface NormalizeSpecifierOptions {
   registry: string
   defaultTag: string
-  alias: string
-  rawSpecifier: RawSpecifier
+  alias?: string
+  bareSpecifier?: BareSpecifier
 }
 
 export type RegistryPackageSpecifierType = 'tag' | 'version' | 'range'

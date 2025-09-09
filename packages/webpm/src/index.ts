@@ -2,6 +2,11 @@ import { logger } from '@webpm/logger'
 import { env } from '@webpm/environment'
 import { NPMRegistry } from '@webpm/registry'
 import type { PackageMetadata } from '@webpm/registry'
+import { 
+  resolvePackageTree, 
+  type DependencyTreeNode, 
+  type RequestPackageOptions 
+} from '@webpm/store'
 
 export interface PackageVersion {
   version: string
@@ -119,6 +124,7 @@ export class WebPM {
     })
   }
 
+
   /**
    * Get package information from npm registry
    * @param packageName - The name of the package to fetch
@@ -197,24 +203,69 @@ export class WebPM {
   }
 
   /**
-   * Install a package (placeholder for future implementation)
+   * Install a package and resolve all its dependencies
    * @param packageName - The name of the package to install
    * @param options - Installation options
    */
   async install(
     packageName: string,
     options: InstallOptions = {}
-  ): Promise<void> {
+  ): Promise<DependencyTreeNode | null> {
     logger.info('Installing package', { packageName, options })
 
-    // This is a placeholder for the actual installation logic
-    // In a real implementation, this would:
-    // 1. Fetch the package tarball
-    // 2. Extract it to a virtual filesystem
-    // 3. Resolve dependencies
-    // 4. Update package.json
+    try {
+      // Create registry instance
+      const registry = new NPMRegistry({
+        url: options.registry || this.config.registry,
+        timeout: this.config.timeout,
+        maxRetries: this.config.retries,
+      })
 
-    throw new Error('Package installation not yet implemented')
+      // Determine package version
+      const packageVersion = options.version || 'latest'
+
+      // Resolve package and all its dependencies
+      const dependencyTree = await resolvePackageTree(
+        packageName,
+        packageVersion,
+        registry,
+        {
+          maxDepth: 10,
+          currentDepth: 0,
+          parentIds: [],
+        }
+      )
+
+      if (!dependencyTree) {
+        logger.error(`Failed to resolve package ${packageName}@${packageVersion}`)
+        return null
+      }
+
+      logger.info(`Successfully resolved package tree for ${packageName}@${packageVersion}`)
+      this.logDependencyTree(dependencyTree)
+
+      return dependencyTree
+
+    } catch (error) {
+      logger.error(`Failed to install package ${packageName}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * Log the dependency tree structure (for debugging)
+   */
+  private logDependencyTree(node: DependencyTreeNode, depth = 0): void {
+    const indent = '  '.repeat(depth)
+    const { name, version } = node.package
+    const childCount = node.children.size
+    
+    logger.info(`${indent}${name}@${version} (${childCount} dependencies)`)
+    
+    // Log children
+    for (const [alias, childNode] of node.children) {
+      this.logDependencyTree(childNode, depth + 1)
+    }
   }
 
   /**

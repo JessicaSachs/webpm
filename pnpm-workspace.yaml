@@ -10,6 +10,7 @@ catalog:
   '@vitejs/plugin-vue': 6.0.1
   '@vitest/coverage-v8': 3.2.4
   '@vitest/ui': 3.2.4
+  '@types/semver': 7.7.1
   bunchee: ^6.6.0
   consola: ^3.4.2
   eslint: ^9.35.0

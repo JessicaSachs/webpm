@@ -15,6 +15,9 @@ catalogs:
     '@types/node':
       specifier: 24.3.1
       version: 24.3.1
+    '@types/semver':
+      specifier: 7.7.1
+      version: 7.7.1
     '@vitejs/plugin-vue':
       specifier: 6.0.1
       version: 6.0.1
@@ -92,9 +95,9 @@ importers:
 
   apps/playground:
     dependencies:
-      '@webpm/resolver':
+      '@webpm/npm-resolver':
         specifier: workspace:*
-        version: link:../../packages/resolvers/resolver
+        version: link:../../packages/resolvers/npm-resolver
       '@webpm/webpm':
         specifier: workspace:*
         version: link:../../packages/webpm
@@ -287,7 +290,7 @@ importers:
         specifier: 'catalog:'
         version: 3.2.4(@types/node@24.3.1)(@vitest/ui@3.2.4)(happy-dom@18.0.1)
 
-  packages/resolvers/resolver:
+  packages/resolvers/npm-resolver:
     dependencies:
       '@webpm/environment':
         specifier: workspace:*
@@ -339,7 +342,7 @@ importers:
         specifier: 'catalog:'
         version: 24.3.1
       '@types/semver':
-        specifier: ^7.7.1
+        specifier: 'catalog:'
         version: 7.7.1
       '@webpm/eslint-config':
         specifier: workspace:*
@@ -350,6 +353,49 @@ importers:
       '@webpm/typescript-config':
         specifier: workspace:*
         version: link:../../config-typescript
+      bunchee:
+        specifier: 'catalog:'
+        version: 6.6.0(typescript@5.9.2)
+      eslint:
+        specifier: 'catalog:'
+        version: 9.35.0
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.2
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/node@24.3.1)(@vitest/ui@3.2.4)(happy-dom@18.0.1)
+
+  packages/store:
+    dependencies:
+      '@webpm/environment':
+        specifier: workspace:*
+        version: link:../environment
+      '@webpm/logger':
+        specifier: workspace:*
+        version: link:../logger
+      '@webpm/registry':
+        specifier: workspace:*
+        version: link:../registry
+      consola:
+        specifier: ^3.4.2
+        version: 3.4.2
+      semver:
+        specifier: 7.7.2
+        version: 7.7.2
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.3.1
+      '@types/semver':
+        specifier: 'catalog:'
+        version: 7.7.1
+      '@webpm/eslint-config':
+        specifier: workspace:*
+        version: link:../config-eslint
+      '@webpm/typescript-config':
+        specifier: workspace:*
+        version: link:../config-typescript
       bunchee:
         specifier: 'catalog:'
         version: 6.6.0(typescript@5.9.2)
@@ -441,6 +487,9 @@ importers:
       parse-npm-tarball-url:
         specifier: ^3.0.0
         version: 3.0.0
+      semver-utils:
+        specifier: ^1.1.4
+        version: 1.1.4
       ssri:
         specifier: ^12.0.0
         version: 12.0.0
@@ -454,6 +503,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.3.1
+      '@types/semver-utils':
+        specifier: ^1.1.3
+        version: 1.1.3
       '@types/ssri':
         specifier: ^7.1.5
         version: 7.1.5
@@ -490,6 +542,9 @@ importers:
       '@webpm/registry':
         specifier: workspace:*
         version: link:../registry
+      '@webpm/store':
+        specifier: workspace:*
+        version: link:../store
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1154,6 +1209,9 @@ packages:
 
   '@types/resolve@1.20.2':
     resolution: {integrity: sha512-60BCwRFOZCQhDncwQdxxeOEEkbc5dIMccYLwbxsS4TUNeVECQ/pBJ0j09mrHOl/JJvpRPGwO9SvE4nR2Nb/a4Q==}
+
+  '@types/semver-utils@1.1.3':
+    resolution: {integrity: sha512-T+YwkslhsM+CeuhYUxyAjWm7mJ5am/K10UX40RuA6k6Lc7eGtq8iY2xOzy7Vq0GOqhl/xZl5l2FwURZMTPTUww==}
 
   '@types/semver@7.7.1':
     resolution: {integrity: sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA==}
@@ -3571,6 +3629,8 @@ snapshots:
       csstype: 3.1.3
 
   '@types/resolve@1.20.2': {}
+
+  '@types/semver-utils@1.1.3': {}
 
   '@types/semver@7.7.1': {}
 

@@ -3,10 +3,16 @@ import {
   UnpublishedPackageError,
   NoVersionsError,
 } from '@webpm/error'
-import { type VersionSelectors, RegistryPackageSpecifier } from '@webpm/types'
+import {
+  type VersionSelectors,
+  PinnedVersion,
+  RegistryPackageSpecifier,
+  WantedDependency,
+} from '@webpm/types'
 import semver from 'semver'
 import util from 'util'
 import { type PackageInRegistry, type PackageMeta } from './pickPackage'
+import versionSelectorType from 'version-selector-type'
 
 export type PickVersionByVersionRange = (
   meta: PackageMeta,
@@ -22,7 +28,6 @@ export function pickPackageFromMeta(
   meta: PackageMeta,
   publishedBy?: Date
 ): PackageInRegistry | null {
-  debugger
   if (
     (!meta.versions || Object.keys(meta.versions).length === 0) &&
     !publishedBy
@@ -256,4 +261,47 @@ class PreferredVersionsPrioritizer {
       .sort((a, b) => parseInt(b, 10) - parseInt(a, 10))
       .map((weight) => versionsByWeight[parseInt(weight, 10)])
   }
+}
+
+function calcSpecifier({
+  wantedDependency,
+  spec,
+  version,
+  defaultPinnedVersion,
+}: {
+  wantedDependency: WantedDependency
+  spec: RegistryPackageSpecifier
+  version: string
+  defaultPinnedVersion?: PinnedVersion
+}): string {
+  if (
+    wantedDependency.prevSpecifier === wantedDependency.bareSpecifier &&
+    wantedDependency.prevSpecifier &&
+    versionSelectorType(wantedDependency.prevSpecifier)?.type === 'tag'
+  ) {
+    return wantedDependency.prevSpecifier
+  }
+  const range = calcRange(version, wantedDependency, defaultPinnedVersion)
+  if (!wantedDependency.alias || spec.name === wantedDependency.alias)
+    return range
+  return `npm:${spec.name}@${range}`
+}
+
+function calcRange(
+  version: string,
+  wantedDependency: WantedDependency,
+  defaultPinnedVersion?: PinnedVersion
+): string {
+  if (semver.parse(version)?.prerelease.length) {
+    return version
+  }
+  const pinnedVersion =
+    (wantedDependency.prevSpecifier
+      ? whichVersionIsPinned(wantedDependency.prevSpecifier)
+      : undefined) ??
+    (wantedDependency.bareSpecifier
+      ? whichVersionIsPinned(wantedDependency.bareSpecifier)
+      : undefined) ??
+    defaultPinnedVersion
+  return createVersionSpec(version, pinnedVersion)
 }

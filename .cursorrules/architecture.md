@@ -20,7 +20,7 @@
   - Support authentication for private registries
   - Use proven npm registry response parsing from pnpm ecosystem
 
-## @webpm/resolver
+## @webpm/npm-resolver
 - **Purpose**: Dependency resolution with semver support
 - **Rules**:
   - Implement SAT solver or similar for conflict resolution

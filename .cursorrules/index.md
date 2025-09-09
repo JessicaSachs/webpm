@@ -25,7 +25,7 @@ This directory contains project-specific rules and guidelines for the WebPM brow
 - `packages/*` - Shared packages
 - `@webpm/core` - Foundation classes and types
 - `@webpm/registry` - NPM registry communication
-- `@webpm/resolver` - Dependency resolution
+- `@webpm/npm-resolver` - Dependency resolution
 - `@webpm/store` - Virtual filesystem
 - `@webpm/webpm` - Main public API
 

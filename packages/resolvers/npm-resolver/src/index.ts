@@ -1,10 +1,14 @@
 /**
- * @webpm/resolver - Dependency resolver for browser environments.
+ * @webpm/npm-resolver - Dependency resolver for browser environments.
  */
 import { normalizeSpecifier, getIntegrity } from '@webpm/utils'
 import { LRUCache } from 'lru-cache'
 import { pickPackage } from './pickPackage'
-import type { PackageMeta, PkgResolutionId } from '@webpm/types'
+import type {
+  PackageMeta,
+  PkgResolutionId,
+  WantedDependency,
+} from '@webpm/types'
 import { NoMatchingVersionError } from '@webpm/error'
 
 /**
@@ -75,24 +79,22 @@ const metaCache = new LRUCache<string, PackageMeta>({
 
 export async function resolveFromNpm({
   alias,
-  rawSpecifier,
-}: {
-  alias: string
-  rawSpecifier: string
-}) {
+  bareSpecifier,
+}: WantedDependency) {
   const spec = normalizeSpecifier({
     registry: 'https://registry.npmjs.org',
     defaultTag: 'latest',
     alias,
-    rawSpecifier,
+    bareSpecifier,
   })
 
   if (!spec) {
     throw new Error(
-      `Unable to normalize specifier: ${rawSpecifier} for alias: ${alias}`
+      `Unable to normalize specifier: ${bareSpecifier} for alias: ${alias}`
     )
   }
 
+  debugger
   const pickPackageResult = await pickPackage(
     {
       fetch: enhancedFetch,
@@ -121,7 +123,7 @@ export async function resolveFromNpm({
     throw new NoMatchingVersionError({
       wantedDependency: {
         alias,
-        bareSpecifier: rawSpecifier,
+        bareSpecifier: bareSpecifier,
       },
       packageMeta: meta,
       registry: 'https://registry.npmjs.org',
@@ -130,22 +132,11 @@ export async function resolveFromNpm({
 
   const id = `${pickedPackage.name}@${pickedPackage.version}` as PkgResolutionId
 
-  debugger
   const resolution = {
     integrity: getIntegrity(pickedPackage.dist),
     tarball: pickedPackage.dist.tarball,
   }
-  // let normalizedBareSpecifier: string | undefined
-  // if (opts.calcSpecifier) {
-  //   normalizedBareSpecifier =
-  //     spec.normalizedBareSpecifier ??
-  //     calcSpecifier({
-  //       wantedDependency,
-  //       spec,
-  //       version: pickedPackage.version,
-  //       defaultPinnedVersion: opts.pinnedVersion,
-  //     })
-  // }
+
   return {
     id,
     latest: meta['dist-tags'].latest,
