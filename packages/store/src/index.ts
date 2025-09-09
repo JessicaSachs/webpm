@@ -3,6 +3,40 @@ import { logger } from '@webpm/logger'
 import semver from 'semver'
 import { tarballFetcher, type FetchedPackage } from './tarball-fetcher'
 
+// Timing utilities
+class Timer {
+  private startTime: number
+  private endTime?: number
+
+  constructor() {
+    this.startTime = performance.now()
+  }
+
+  stop(): number {
+    this.endTime = performance.now()
+    return this.endTime - this.startTime
+  }
+
+  getElapsed(): number {
+    return (this.endTime || performance.now()) - this.startTime
+  }
+}
+
+function createTimings(): InstallationTimings {
+  return {
+    totalTime: 0,
+    resolutionTime: 0,
+    fetchingTime: 0,
+    extractionTime: 0,
+    phases: {
+      dependencyResolution: 0,
+      packageFetching: 0,
+      tarballExtraction: 0,
+      treeBuilding: 0,
+    }
+  }
+}
+
 // Types for dependency resolution
 export interface WantedDependency {
   alias: string
@@ -45,6 +79,20 @@ export interface FetchedDependencyTree {
   allFetchedPackages: Map<string, FetchedPackage>
   totalPackages: number
   totalFiles: number
+  timings: InstallationTimings
+}
+
+export interface InstallationTimings {
+  totalTime: number
+  resolutionTime: number
+  fetchingTime: number
+  extractionTime: number
+  phases: {
+    dependencyResolution: number
+    packageFetching: number
+    tarballExtraction: number
+    treeBuilding: number
+  }
 }
 
 export interface ResolutionContext {
@@ -70,7 +118,7 @@ export interface RequestPackageOptions {
 export async function requestPackage(
   wantedDependency: WantedDependency,
   context: ResolutionContext,
-  options: RequestPackageOptions = {}
+  _options: RequestPackageOptions = {}
 ): Promise<ResolvedPackage | null> {
   const { alias, bareSpecifier } = wantedDependency
   const { registry, resolvedPackages, maxDepth = 10, currentDepth = 0, parentIds = [] } = context
@@ -388,11 +436,14 @@ export async function fetchDependencyTree(
   const { maxConcurrent = 5 } = options;
   const allFetchedPackages = new Map<string, FetchedPackage>();
   let totalFiles = 0;
+  const timings = createTimings();
+  const totalTimer = new Timer();
 
   try {
     logger.info(`Fetching packages for dependency tree with max concurrency: ${maxConcurrent}`);
 
-    // Collect all packages that need to be fetched
+    // Phase 1: Collect packages to fetch
+    const collectTimer = new Timer();
     const packagesToFetch: ResolvedPackage[] = [];
     const collectPackages = (node: DependencyTreeNode) => {
       packagesToFetch.push(node.package);
@@ -401,31 +452,45 @@ export async function fetchDependencyTree(
       }
     };
     collectPackages(dependencyTree);
+    timings.phases.treeBuilding = collectTimer.stop();
 
     logger.info(`Found ${packagesToFetch.length} packages to fetch`);
 
-    // Fetch packages in batches to control concurrency
+    // Phase 2: Fetch packages in batches
+    const fetchTimer = new Timer();
     const batches: ResolvedPackage[][] = [];
     for (let i = 0; i < packagesToFetch.length; i += maxConcurrent) {
       batches.push(packagesToFetch.slice(i, i + maxConcurrent));
     }
 
-    // Process each batch
-    for (const batch of batches) {
+    // Process each batch with timing
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      const batchTimer = new Timer();
+      
       const batchPromises = batch.map(async (pkg) => {
+        const packageTimer = new Timer();
         const fetched = await tarballFetcher.fetchPackage(pkg);
+        const packageTime = packageTimer.stop();
+        
         if (fetched) {
           allFetchedPackages.set(pkg.id, fetched);
           totalFiles += fetched.extractedFiles.files.length;
+          logger.debug(`Fetched ${pkg.id} in ${packageTime.toFixed(2)}ms`);
         }
         return fetched;
       });
 
       await Promise.all(batchPromises);
-      logger.debug(`Completed batch of ${batch.length} packages`);
+      const batchTime = batchTimer.stop();
+      logger.debug(`Completed batch ${batchIndex + 1}/${batches.length} (${batch.length} packages) in ${batchTime.toFixed(2)}ms`);
     }
 
-    // Update the dependency tree with fetched packages
+    timings.phases.packageFetching = fetchTimer.stop();
+    timings.fetchingTime = timings.phases.packageFetching;
+
+    // Phase 3: Update tree with fetched packages
+    const updateTimer = new Timer();
     const updateTreeWithFetched = (node: DependencyTreeNode) => {
       const fetched = allFetchedPackages.get(node.package.id);
       if (fetched) {
@@ -436,19 +501,33 @@ export async function fetchDependencyTree(
       }
     };
     updateTreeWithFetched(dependencyTree);
+    timings.phases.treeBuilding += updateTimer.stop();
+
+    // Calculate total time
+    timings.totalTime = totalTimer.stop();
 
     const result: FetchedDependencyTree = {
       root: dependencyTree,
       allFetchedPackages,
       totalPackages: allFetchedPackages.size,
       totalFiles,
+      timings,
     };
 
+    // Log detailed timing information
     logger.info(`Successfully fetched ${result.totalPackages} packages with ${result.totalFiles} total files`);
+    logger.info(`Timing breakdown:`);
+    logger.info(`  Total time: ${timings.totalTime.toFixed(2)}ms`);
+    logger.info(`  Tree building: ${timings.phases.treeBuilding.toFixed(2)}ms`);
+    logger.info(`  Package fetching: ${timings.phases.packageFetching.toFixed(2)}ms`);
+    logger.info(`  Average per package: ${(timings.phases.packageFetching / result.totalPackages).toFixed(2)}ms`);
+
     return result;
 
   } catch (error) {
+    timings.totalTime = totalTimer.stop();
     logger.error('Failed to fetch dependency tree:', error);
+    logger.error(`Failed after ${timings.totalTime.toFixed(2)}ms`);
     return null;
   }
 }
@@ -462,18 +541,26 @@ export async function resolveAndFetchPackage(
   registry: NPMRegistry,
   options: RequestPackageOptions & { maxConcurrent?: number } = {}
 ): Promise<FetchedDependencyTree | null> {
+  const totalTimer = new Timer();
+  const timings = createTimings();
+
   try {
     logger.info(`Resolving and fetching package: ${packageName}@${packageVersion}`);
 
-    // First resolve the dependency tree
+    // Phase 1: Resolve the dependency tree
+    const resolutionTimer = new Timer();
     const dependencyTree = await resolvePackageTree(packageName, packageVersion, registry, options);
+    timings.resolutionTime = resolutionTimer.stop();
+    timings.phases.dependencyResolution = timings.resolutionTime;
     
     if (!dependencyTree) {
       logger.error(`Failed to resolve dependency tree for ${packageName}@${packageVersion}`);
       return null;
     }
 
-    // Then fetch all packages
+    logger.info(`Dependency resolution completed in ${timings.resolutionTime.toFixed(2)}ms`);
+
+    // Phase 2: Fetch all packages
     const fetchedTree = await fetchDependencyTree(dependencyTree, options);
     
     if (!fetchedTree) {
@@ -481,11 +568,35 @@ export async function resolveAndFetchPackage(
       return null;
     }
 
+    // Merge timing information
+    timings.fetchingTime = fetchedTree.timings.fetchingTime;
+    timings.extractionTime = fetchedTree.timings.extractionTime;
+    timings.phases.packageFetching = fetchedTree.timings.phases.packageFetching;
+    timings.phases.tarballExtraction = fetchedTree.timings.phases.tarballExtraction;
+    timings.phases.treeBuilding = fetchedTree.timings.phases.treeBuilding;
+
+    // Calculate total time
+    timings.totalTime = totalTimer.stop();
+
+    // Update the fetched tree with complete timing information
+    fetchedTree.timings = timings;
+
+    // Log comprehensive timing summary
     logger.info(`Successfully resolved and fetched ${packageName}@${packageVersion} with ${fetchedTree.totalPackages} packages`);
+    logger.info(`Complete timing breakdown:`);
+    logger.info(`  Total time: ${timings.totalTime.toFixed(2)}ms`);
+    logger.info(`  Resolution: ${timings.resolutionTime.toFixed(2)}ms (${((timings.resolutionTime / timings.totalTime) * 100).toFixed(1)}%)`);
+    logger.info(`  Fetching: ${timings.fetchingTime.toFixed(2)}ms (${((timings.fetchingTime / timings.totalTime) * 100).toFixed(1)}%)`);
+    logger.info(`  Extraction: ${timings.extractionTime.toFixed(2)}ms (${((timings.extractionTime / timings.totalTime) * 100).toFixed(1)}%)`);
+    logger.info(`  Tree building: ${timings.phases.treeBuilding.toFixed(2)}ms`);
+    logger.info(`  Average per package: ${(timings.fetchingTime / fetchedTree.totalPackages).toFixed(2)}ms`);
+
     return fetchedTree;
 
   } catch (error) {
+    timings.totalTime = totalTimer.stop();
     logger.error(`Failed to resolve and fetch package ${packageName}@${packageVersion}:`, error);
+    logger.error(`Failed after ${timings.totalTime.toFixed(2)}ms`);
     return null;
   }
 }

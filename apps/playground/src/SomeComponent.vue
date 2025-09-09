@@ -11,6 +11,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { formatDuration, intervalToDuration } from 'date-fns';
 // import * as merp from './foo';
 
 // merp;
@@ -27,7 +28,38 @@ const resolve = async () => {
   })
 
   // const manifest = resolveResult
-  result.value = JSON.stringify(resolveResult, null, 2)
+  if (resolveResult?.timings) {
+    const formattedTimings = formatTimings(resolveResult.timings);
+    result.value = formattedTimings;
+  } else {
+    result.value = 'No timings available';
+  }
+}
+
+const formatTimings = (timings: Record<string, any>) => {
+  const formatted: string[] = [];
+  
+  for (const [key, value] of Object.entries(timings)) {
+    if (typeof value === 'number') {
+      const roundedMs = Math.round(value * 10) / 10;
+      const duration = intervalToDuration({ start: 0, end: roundedMs });
+      const humanReadable = formatDuration(duration, { 
+        format: ['hours', 'minutes', 'seconds'],
+        delimiter: ' '
+      });
+      const ms = Math.round(roundedMs % 1000);
+      const display = humanReadable ? `${humanReadable} ${ms}ms` : `${ms}ms`;
+      formatted.push(`${key}: ${display}`);
+    } else if (typeof value === 'object' && value !== null) {
+      formatted.push(`${key}:`);
+      const subTimings = formatTimings(value);
+      formatted.push(...subTimings.split('\n').map(line => `  ${line}`));
+    } else {
+      formatted.push(`${key}: ${value}`);
+    }
+  }
+  
+  return formatted.join('\n');
 }
 </script>
 

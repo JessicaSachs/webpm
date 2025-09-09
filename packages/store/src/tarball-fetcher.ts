@@ -15,7 +15,7 @@ export interface ExtractedFile {
 
 export interface ExtractionResult {
   files: ExtractedFile[];
-  manifest?: any;
+  manifest?: Record<string, unknown>;
   hasInstallScript: boolean;
 }
 
@@ -24,6 +24,11 @@ export interface FetchedPackage {
   extractedFiles: ExtractionResult;
   tarballBuffer: ArrayBuffer;
   integrity: string;
+  timings: {
+    fetchTime: number;
+    extractionTime: number;
+    totalTime: number;
+  };
 }
 
 export class TarballFetcher {
@@ -34,6 +39,7 @@ export class TarballFetcher {
    */
   async fetchPackage(resolvedPackage: ResolvedPackage): Promise<FetchedPackage | null> {
     const packageId = resolvedPackage.id;
+    const totalTimer = performance.now();
     
     // Check cache first
     if (this.cache.has(packageId)) {
@@ -42,10 +48,12 @@ export class TarballFetcher {
     }
 
     try {
-      logger.info(`Fetching tarball for package: ${packageId}`);
+      logger.debug(`Fetching tarball for package: ${packageId}`);
       
       // Fetch the tarball
+      const fetchTimer = performance.now();
       const tarballBuffer = await this.fetchTarball(resolvedPackage.resolution.tarball);
+      const fetchTime = performance.now() - fetchTimer;
       
       if (!tarballBuffer) {
         logger.error(`Failed to fetch tarball for ${packageId}`);
@@ -53,7 +61,9 @@ export class TarballFetcher {
       }
 
       // Extract the tarball
+      const extractionTimer = performance.now();
       const extractedFiles = await this.extractTarball(tarballBuffer);
+      const extractionTime = performance.now() - extractionTimer;
       
       if (!extractedFiles) {
         logger.error(`Failed to extract tarball for ${packageId}`);
@@ -63,21 +73,29 @@ export class TarballFetcher {
       // Calculate integrity
       const integrity = await this.calculateIntegrity(tarballBuffer);
 
+      const totalTime = performance.now() - totalTimer;
+
       const fetchedPackage: FetchedPackage = {
         package: resolvedPackage,
         extractedFiles,
         tarballBuffer,
         integrity,
+        timings: {
+          fetchTime,
+          extractionTime,
+          totalTime,
+        },
       };
 
       // Cache the result
       this.cache.set(packageId, fetchedPackage);
       
-      logger.info(`Successfully fetched and extracted package: ${packageId}`);
+      logger.debug(`Successfully fetched and extracted package: ${packageId} in ${totalTime.toFixed(2)}ms (fetch: ${fetchTime.toFixed(2)}ms, extract: ${extractionTime.toFixed(2)}ms)`);
       return fetchedPackage;
 
     } catch (error) {
-      logger.error(`Failed to fetch package ${packageId}:`, error);
+      const totalTime = performance.now() - totalTimer;
+      logger.error(`Failed to fetch package ${packageId} after ${totalTime.toFixed(2)}ms:`, error);
       return null;
     }
   }
@@ -114,7 +132,7 @@ export class TarballFetcher {
       logger.debug("Extracting tarball using tar-stream...");
 
       const files: ExtractedFile[] = [];
-      let manifest: any = null;
+      let manifest: Record<string, unknown> | null = null;
       let hasInstallScript = false;
 
       return new Promise((resolve, reject) => {
@@ -203,7 +221,7 @@ export class TarballFetcher {
         try {
           // Try to decompress as gzip first
           decompressedData = gunzipSync(uint8Array);
-        } catch (_error) {
+        } catch {
           // If it fails, assume it's already uncompressed tar data
           decompressedData = uint8Array;
         }
@@ -247,8 +265,8 @@ export class TarballFetcher {
   /**
    * Get package structure from extracted files
    */
-  getPackageStructure(result: ExtractionResult): Record<string, any> {
-    const structure: Record<string, any> = {};
+  getPackageStructure(result: ExtractionResult): Record<string, unknown> {
+    const structure: Record<string, unknown> = {};
 
     for (const file of result.files) {
       const pathParts = file.name.split("/").slice(1); // Remove package folder prefix
@@ -289,10 +307,6 @@ export class TarballFetcher {
           : buffer;
 
       const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer as ArrayBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
       return `sha256-${btoa(
         String.fromCharCode(...new Uint8Array(hashBuffer))
       )}`;

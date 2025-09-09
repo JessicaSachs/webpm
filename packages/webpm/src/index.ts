@@ -289,6 +289,16 @@ export class WebPM {
       }
 
       logger.info(`Successfully installed and fetched ${packageName} with ${fetchedTree.totalPackages} packages and ${fetchedTree.totalFiles} files`)
+      
+      // Log timing summary
+      const { timings } = fetchedTree;
+      logger.info(`Installation timing summary:`);
+      logger.info(`  Total time: ${timings.totalTime.toFixed(2)}ms`);
+      logger.info(`  Resolution: ${timings.resolutionTime.toFixed(2)}ms`);
+      logger.info(`  Fetching: ${timings.fetchingTime.toFixed(2)}ms`);
+      logger.info(`  Extraction: ${timings.extractionTime.toFixed(2)}ms`);
+      logger.info(`  Average per package: ${(timings.fetchingTime / fetchedTree.totalPackages).toFixed(2)}ms`);
+      
       return fetchedTree
 
     } catch (error) {
