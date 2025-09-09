@@ -22,8 +22,8 @@
     }
   },
   "scripts": {
-    "build": "bunchee --no-external",
-    "dev": "bunchee --watch --no-external",
+    "build": "bunchee --external=tar-stream",
+    "dev": "bunchee --watch --external=tar-stream",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
     "test": "vitest --project logger"
@@ -33,13 +33,15 @@
     "@webpm/logger": "workspace:*",
     "@webpm/registry": "workspace:*",
     "consola": "^3.4.2",
+    "fflate": "^0.8.2",
     "semver": "7.7.2"
   },
   "devDependencies": {
-    "@webpm/eslint-config": "workspace:*",
-    "@webpm/typescript-config": "workspace:*",
     "@types/node": "catalog:",
     "@types/semver": "catalog:",
+    "@types/tar-stream": "^3.1.4",
+    "@webpm/eslint-config": "workspace:*",
+    "@webpm/typescript-config": "workspace:*",
     "bunchee": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",

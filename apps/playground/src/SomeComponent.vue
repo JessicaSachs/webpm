@@ -11,6 +11,9 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+// import * as merp from './foo';
+
+// merp;
 import { webpm } from '@webpm/webpm';
 
 const alias = ref('vue');
@@ -19,7 +22,7 @@ const bareSpecifier = ref('3.0.0');
 const result = ref('')
 
 const resolve = async () => {
-  const resolveResult = await webpm.install(alias.value, {
+  const resolveResult = await webpm.installAndFetch(alias.value, {
     version: bareSpecifier.value,
   })
 

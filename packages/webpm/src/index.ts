@@ -4,8 +4,9 @@ import { NPMRegistry } from '@webpm/registry'
 import type { PackageMetadata } from '@webpm/registry'
 import { 
   resolvePackageTree, 
+  resolveAndFetchPackage,
   type DependencyTreeNode, 
-  type RequestPackageOptions 
+  type FetchedDependencyTree
 } from '@webpm/store'
 
 export interface PackageVersion {
@@ -253,6 +254,50 @@ export class WebPM {
   }
 
   /**
+   * Install a package, resolve dependencies, and fetch all tarballs
+   * @param packageName - The name of the package to install
+   * @param options - Installation options
+   */
+  async installAndFetch(
+    packageName: string,
+    options: InstallOptions & { maxConcurrent?: number } = {}
+  ): Promise<FetchedDependencyTree | null> {
+    logger.info('Installing and fetching package', { packageName, options })
+
+    try {
+      // Create registry instance
+      const registry = new NPMRegistry({
+        url: options.registry || this.config.registry,
+        timeout: this.config.timeout,
+        maxRetries: this.config.retries,
+      })
+      
+      // Resolve, fetch, and extract all packages
+      const fetchedTree = await resolveAndFetchPackage(
+        packageName,
+        options.version || 'latest',
+        registry,
+        {
+          maxDepth: 10,
+          maxConcurrent: options.maxConcurrent || this.config.concurrency,
+        }
+      )
+
+      if (!fetchedTree) {
+        logger.error(`Failed to resolve and fetch dependencies for ${packageName}`)
+        return null
+      }
+
+      logger.info(`Successfully installed and fetched ${packageName} with ${fetchedTree.totalPackages} packages and ${fetchedTree.totalFiles} files`)
+      return fetchedTree
+
+    } catch (error) {
+      logger.error(`Failed to install and fetch package ${packageName}:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Log the dependency tree structure (for debugging)
    */
   private logDependencyTree(node: DependencyTreeNode, depth = 0): void {
@@ -263,7 +308,7 @@ export class WebPM {
     logger.info(`${indent}${name}@${version} (${childCount} dependencies)`)
     
     // Log children
-    for (const [alias, childNode] of node.children) {
+    for (const [, childNode] of node.children) {
       this.logDependencyTree(childNode, depth + 1)
     }
   }

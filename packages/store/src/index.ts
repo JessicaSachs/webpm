@@ -1,6 +1,7 @@
 import { NPMRegistry, type PackageMetadata, type PackageVersions } from '@webpm/registry'
 import { logger } from '@webpm/logger'
 import semver from 'semver'
+import { tarballFetcher, type FetchedPackage } from './tarball-fetcher'
 
 // Types for dependency resolution
 export interface WantedDependency {
@@ -36,6 +37,14 @@ export interface DependencyTreeNode {
   children: Map<string, DependencyTreeNode>
   depth: number
   installable: boolean
+  fetched?: FetchedPackage
+}
+
+export interface FetchedDependencyTree {
+  root: DependencyTreeNode
+  allFetchedPackages: Map<string, FetchedPackage>
+  totalPackages: number
+  totalFiles: number
 }
 
 export interface ResolutionContext {
@@ -61,7 +70,7 @@ export interface RequestPackageOptions {
 export async function requestPackage(
   wantedDependency: WantedDependency,
   context: ResolutionContext,
-  _options: RequestPackageOptions = {}
+  options: RequestPackageOptions = {}
 ): Promise<ResolvedPackage | null> {
   const { alias, bareSpecifier } = wantedDependency
   const { registry, resolvedPackages, maxDepth = 10, currentDepth = 0, parentIds = [] } = context
@@ -361,3 +370,126 @@ export async function resolvePackageTree(
 
   return rootNode
 }
+
+/**
+ * Fetch a single package tarball and extract it
+ */
+export async function fetchPackage(resolvedPackage: ResolvedPackage): Promise<FetchedPackage | null> {
+  return await tarballFetcher.fetchPackage(resolvedPackage);
+}
+
+/**
+ * Fetch all packages in a dependency tree
+ */
+export async function fetchDependencyTree(
+  dependencyTree: DependencyTreeNode,
+  options: { maxConcurrent?: number } = {}
+): Promise<FetchedDependencyTree | null> {
+  const { maxConcurrent = 5 } = options;
+  const allFetchedPackages = new Map<string, FetchedPackage>();
+  let totalFiles = 0;
+
+  try {
+    logger.info(`Fetching packages for dependency tree with max concurrency: ${maxConcurrent}`);
+
+    // Collect all packages that need to be fetched
+    const packagesToFetch: ResolvedPackage[] = [];
+    const collectPackages = (node: DependencyTreeNode) => {
+      packagesToFetch.push(node.package);
+      for (const childNode of node.children.values()) {
+        collectPackages(childNode);
+      }
+    };
+    collectPackages(dependencyTree);
+
+    logger.info(`Found ${packagesToFetch.length} packages to fetch`);
+
+    // Fetch packages in batches to control concurrency
+    const batches: ResolvedPackage[][] = [];
+    for (let i = 0; i < packagesToFetch.length; i += maxConcurrent) {
+      batches.push(packagesToFetch.slice(i, i + maxConcurrent));
+    }
+
+    // Process each batch
+    for (const batch of batches) {
+      const batchPromises = batch.map(async (pkg) => {
+        const fetched = await tarballFetcher.fetchPackage(pkg);
+        if (fetched) {
+          allFetchedPackages.set(pkg.id, fetched);
+          totalFiles += fetched.extractedFiles.files.length;
+        }
+        return fetched;
+      });
+
+      await Promise.all(batchPromises);
+      logger.debug(`Completed batch of ${batch.length} packages`);
+    }
+
+    // Update the dependency tree with fetched packages
+    const updateTreeWithFetched = (node: DependencyTreeNode) => {
+      const fetched = allFetchedPackages.get(node.package.id);
+      if (fetched) {
+        node.fetched = fetched;
+      }
+      for (const childNode of node.children.values()) {
+        updateTreeWithFetched(childNode);
+      }
+    };
+    updateTreeWithFetched(dependencyTree);
+
+    const result: FetchedDependencyTree = {
+      root: dependencyTree,
+      allFetchedPackages,
+      totalPackages: allFetchedPackages.size,
+      totalFiles,
+    };
+
+    logger.info(`Successfully fetched ${result.totalPackages} packages with ${result.totalFiles} total files`);
+    return result;
+
+  } catch (error) {
+    logger.error('Failed to fetch dependency tree:', error);
+    return null;
+  }
+}
+
+/**
+ * Main function to resolve and fetch a package with all its dependencies
+ */
+export async function resolveAndFetchPackage(
+  packageName: string,
+  packageVersion: string,
+  registry: NPMRegistry,
+  options: RequestPackageOptions & { maxConcurrent?: number } = {}
+): Promise<FetchedDependencyTree | null> {
+  try {
+    logger.info(`Resolving and fetching package: ${packageName}@${packageVersion}`);
+
+    // First resolve the dependency tree
+    const dependencyTree = await resolvePackageTree(packageName, packageVersion, registry, options);
+    
+    if (!dependencyTree) {
+      logger.error(`Failed to resolve dependency tree for ${packageName}@${packageVersion}`);
+      return null;
+    }
+
+    // Then fetch all packages
+    const fetchedTree = await fetchDependencyTree(dependencyTree, options);
+    
+    if (!fetchedTree) {
+      logger.error(`Failed to fetch packages for ${packageName}@${packageVersion}`);
+      return null;
+    }
+
+    logger.info(`Successfully resolved and fetched ${packageName}@${packageVersion} with ${fetchedTree.totalPackages} packages`);
+    return fetchedTree;
+
+  } catch (error) {
+    logger.error(`Failed to resolve and fetch package ${packageName}@${packageVersion}:`, error);
+    return null;
+  }
+}
+
+// Re-export tarball fetcher utilities
+export { tarballFetcher } from './tarball-fetcher';
+export type { ExtractedFile, ExtractionResult } from './tarball-fetcher';
