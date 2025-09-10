@@ -102,6 +102,7 @@ export interface ResolutionContext {
   maxDepth: number
   currentDepth: number
   parentIds: string[]
+  onResult?: (result: FetchedDependencyTree) => void
 }
 
 export interface RequestPackageOptions {
@@ -110,6 +111,7 @@ export interface RequestPackageOptions {
   maxDepth?: number
   preferWorkspacePackages?: boolean
   updateToLatest?: boolean
+  onResult?: (result: FetchedPackage) => void
 }
 
 /**
@@ -121,7 +123,7 @@ export async function requestPackage(
   _options: RequestPackageOptions = {}
 ): Promise<ResolvedPackage | null> {
   const { alias, bareSpecifier } = wantedDependency
-  const { registry, resolvedPackages, maxDepth = 10, currentDepth = 0, parentIds = [] } = context
+  const { registry, resolvedPackages, maxDepth = 10, currentDepth = 0, parentIds = [], onResult } = context
 
   // Check if we've already resolved this package
   const existingPackage = resolvedPackages.get(alias)
@@ -271,7 +273,7 @@ export async function resolveDependencies(
   context: ResolutionContext,
   options: RequestPackageOptions = {}
 ): Promise<DependencyTreeNode | null> {
-  const { currentDepth = 0, parentIds = [] } = options
+  const { currentDepth = 0, parentIds = [], onResult } = options
   const { dependencyTree, maxDepth = 10 } = context
 
   // Check if we've already built this part of the tree
@@ -341,6 +343,7 @@ export async function resolveDependencies(
           currentDepth: currentDepth + 1,
           parentIds: newParentIds,
           maxDepth,
+          onResult,
         }
       )
 
@@ -369,7 +372,7 @@ export async function resolveDependencies(
 /**
  * Create a new resolution context
  */
-export function createResolutionContext(registry: NPMRegistry, maxDepth = 10): ResolutionContext {
+export function createResolutionContext(registry: NPMRegistry, maxDepth = 16): ResolutionContext {
   return {
     registry,
     resolvedPackages: new Map(),
@@ -431,7 +434,7 @@ export async function fetchPackage(resolvedPackage: ResolvedPackage): Promise<Fe
  */
 export async function fetchDependencyTree(
   dependencyTree: DependencyTreeNode,
-  options: { maxConcurrent?: number } = {}
+  options: { maxConcurrent?: number, onResult?: (result: FetchedPackage) => void } = {}
 ): Promise<FetchedDependencyTree | null> {
   const { maxConcurrent = 5 } = options;
   const allFetchedPackages = new Map<string, FetchedPackage>();
@@ -474,6 +477,7 @@ export async function fetchDependencyTree(
         const packageTime = packageTimer.stop();
         
         if (fetched) {
+          options.onResult?.(fetched);
           allFetchedPackages.set(pkg.id, fetched);
           totalFiles += fetched.extractedFiles.files.length;
           logger.debug(`Fetched ${pkg.id} in ${packageTime.toFixed(2)}ms`);
@@ -539,7 +543,7 @@ export async function resolveAndFetchPackage(
   packageName: string,
   packageVersion: string,
   registry: NPMRegistry,
-  options: RequestPackageOptions & { maxConcurrent?: number } = {}
+  options: RequestPackageOptions & { maxConcurrent?: number, onResult?: (result: FetchedDependencyTree) => void } = {}
 ): Promise<FetchedDependencyTree | null> {
   const totalTimer = new Timer();
   const timings = createTimings();
@@ -601,6 +605,4 @@ export async function resolveAndFetchPackage(
   }
 }
 
-// Re-export tarball fetcher utilities
-export { tarballFetcher } from './tarball-fetcher';
-export type { ExtractedFile, ExtractionResult } from './tarball-fetcher';
+export * from './tarball-fetcher';

@@ -27,6 +27,7 @@ export interface InstallOptions {
   peer?: boolean
   cache?: boolean
   registry?: string
+  onResult?: (result: FetchedDependencyTree) => void
 }
 
 export interface WebpmConfig {
@@ -272,12 +273,14 @@ export class WebPM {
         maxRetries: this.config.retries,
       })
       
+      debugger
       // Resolve, fetch, and extract all packages
       const fetchedTree = await resolveAndFetchPackage(
         packageName,
         options.version || 'latest',
         registry,
         {
+          onResult: options.onResult,
           maxDepth: 10,
           maxConcurrent: options.maxConcurrent || this.config.concurrency,
         }
@@ -463,3 +466,5 @@ export class WebPM {
 
 // Export a default instance for convenience
 export const webpm = new WebPM()
+
+export * from '@webpm/store'

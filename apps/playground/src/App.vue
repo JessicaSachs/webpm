@@ -15,7 +15,7 @@
       </a>
     </p>
 
-    <TypeScriptVFSDemo/>
+    <SomeComponent/>
     
     <div class="npm-fetcher">
       <h2>NPM Package Fetcher</h2>
@@ -72,7 +72,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import TypeScriptVFSDemo from './TypeScriptVFSDemo.vue';
+import SomeComponent from './SomeComponent.vue';
 import { webpm, type PackageInfo } from '@webpm/webpm';
 
 // Reactive state

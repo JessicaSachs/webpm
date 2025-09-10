@@ -6,26 +6,64 @@
     <input v-model="bareSpecifier" />
     <button @click="resolve">Resolve</button>
     <pre>{{ result }}</pre>
+    <pre>{{ diagnostics }}</pre>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onBeforeMount, onMounted, ref } from 'vue';
 import { formatDuration, intervalToDuration } from 'date-fns';
-// import * as merp from './foo';
 
-// merp;
 import { webpm } from '@webpm/webpm';
+import { createSystem, createDefaultMapFromCDN, createVirtualCompilerHost } from "@typescript/vfs"
+import ts from "typescript"
+import type { FetchedPackage, ExtractedFile } from '@webpm/webpm';
 
 const alias = ref('vue');
 const bareSpecifier = ref('3.0.0');
 
 const result = ref('')
 
+const compilerOpts = {}
+// const env = createVirtualTypeScriptEnvironment(system, ["index.ts"], ts, compilerOpts)
+
+let fsMap: Map<string, string>
+let system: ReturnType<typeof createSystem>
+
+  const fileNames = ["index.ts"]
+onMounted(async () => {
+  fsMap = await createDefaultMapFromCDN({ target: ts.ScriptTarget.ES2022 }, "5.9.2", true, ts)
+  system = createSystem(fsMap)
+  fsMap.set("package.json", '{"name": "playground", "version": "1.0.0", "dependencies": {"leftpad": "1.0.0"}}')
+  fsMap.set("index.ts", 'const a: number = "Definitely not a number";')
+})
+
+// You can then interact with the languageService to introspect the code
+const diagnostics = ref<ts.Diagnostic[] | readonly ts.Diagnostic[]>([])
+
 const resolve = async () => {
+  const host = createVirtualCompilerHost(system, compilerOpts, ts);
+  const program = ts.createProgram(fileNames, compilerOpts, host.compilerHost);
+  
   const resolveResult = await webpm.installAndFetch(alias.value, {
     version: bareSpecifier.value,
+    onResult: (dependency: FetchedPackage) => {
+      const name = dependency.extractedFiles.manifest?.name;
+      dependency.extractedFiles.files.forEach((file: ExtractedFile) => {
+        fsMap.set(`/node_modules/${name}/${file.name}`, file.buffer.toString());
+      });
+    }
   })
+
+  // ts.Diagnostic contains circular references, so we need to safely stringify for display
+  const rawDiagnostics = ts.getPreEmitDiagnostics(program);
+  diagnostics.value = rawDiagnostics.map(d => {
+    return {
+      fileName: d.file?.fileName,
+      text: d.file?.text,
+      messageText: d.messageText.toString()
+    }
+  });
 
   // const manifest = resolveResult
   if (resolveResult?.timings) {
