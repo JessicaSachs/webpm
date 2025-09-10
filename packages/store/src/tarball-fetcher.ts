@@ -64,7 +64,9 @@ export class TarballFetcher {
       const extractionTimer = performance.now();
       const extractedFiles = await this.extractTarball(tarballBuffer);
       const extractionTime = performance.now() - extractionTimer;
-      
+
+      const dTsFiles = extractedFiles?.files.filter(file => file.name.endsWith('.d.ts'));
+      console.log('dTsFiles', dTsFiles);
       if (!extractedFiles) {
         logger.error(`Failed to extract tarball for ${packageId}`);
         return null;
