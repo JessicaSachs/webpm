@@ -66,7 +66,7 @@ export class TarballFetcher {
       const extractionTime = performance.now() - extractionTimer;
 
       const dTsFiles = extractedFiles?.files.filter(file => file.name.endsWith('.d.ts'));
-      console.log('dTsFiles', dTsFiles);
+      logger.debug('dTsFiles', dTsFiles);
       if (!extractedFiles) {
         logger.error(`Failed to extract tarball for ${packageId}`);
         return null;
@@ -138,7 +138,6 @@ export class TarballFetcher {
       let hasInstallScript = false;
 
       return new Promise((resolve, reject) => {
-        console.log('extract', tar)
         const extract = tar.extract();
 
         extract.on("entry", (header, stream, next) => {
@@ -158,8 +157,9 @@ export class TarballFetcher {
           stream.on("end", () => {
             const fileBuffer = Buffer.concat(chunks);
 
+            const name = header.name.replace(/^package\//, '');
             const extractedFile: ExtractedFile = {
-              name: header.name,
+              name, // Normalize the name from the tarball
               buffer: fileBuffer,
               size: header.size || fileBuffer.length,
               type: header.type || "file",
@@ -171,8 +171,7 @@ export class TarballFetcher {
 
             // Check for package.json (manifest)
             if (
-              header.name.endsWith("package.json") &&
-              header.name.split("/").length === 2
+              name === "package.json"
             ) {
               try {
                 const manifestText = fileBuffer.toString("utf8");
@@ -196,7 +195,7 @@ export class TarballFetcher {
           });
 
           stream.on("error", (error) => {
-            logger.warn(`Error processing entry ${header.name}:`, error);
+            logger.warn(`Error processing entry ${name}:`, error);
             next();
           });
         });

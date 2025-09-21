@@ -1,5 +1,5 @@
 <template>
-  What is going on?
+  <div>Hello world</div>
 </template>
 
 <script setup lang="ts">
@@ -26,5 +26,4 @@ const diagnostics = ts.getPreEmitDiagnostics(program);
 // You can then interact with the languageService to introspect the code
 console.log(diagnostics)
 
-debugger;
 </script>

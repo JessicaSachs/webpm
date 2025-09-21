@@ -1,28 +1,26 @@
 <template>
   <div>
-    <h1>Demo Component</h1>
-    <p>{{ alias }} {{ bareSpecifier }}</p>
-    <input v-model="alias" />
-    <input v-model="bareSpecifier" />
     <button @click="resolve">Resolve</button>
-    <pre>{{ result }}</pre>
+    <pre>{{ resultToPrint }}</pre>
     <pre>{{ diagnostics }}</pre>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, onMounted, ref } from 'vue';
+import { onBeforeMount, onMounted, ref, computed } from 'vue';
 import { formatDuration, intervalToDuration } from 'date-fns';
 
 import { webpm } from '@webpm/webpm';
 import { createSystem, createDefaultMapFromCDN, createVirtualCompilerHost } from "@typescript/vfs"
 import ts from "typescript"
-import type { FetchedPackage, ExtractedFile } from '@webpm/webpm';
+import type { FetchedDependencyTree, FetchedPackage, ExtractedFile } from '@webpm/webpm';
 
-const alias = ref('vue');
-const bareSpecifier = ref('3.0.0');
+const props = defineProps<{
+  packageJson: string;
+  files: { name: string; content: string }[];
+}>();
 
-const result = ref('')
+const result = ref()
 
 const compilerOpts = {}
 // const env = createVirtualTypeScriptEnvironment(system, ["index.ts"], ts, compilerOpts)
@@ -30,12 +28,32 @@ const compilerOpts = {}
 let fsMap: Map<string, string>
 let system: ReturnType<typeof createSystem>
 
-  const fileNames = ["index.ts"]
+const resultToPrint = computed(() => {
+  return result.value?.map((r: FetchedDependencyTree) => {
+    return {
+      name: r.root.package.name,
+      version: r.root.package.version,
+      allFetchedPackages: Array.from(r.allFetchedPackages.values()).map((p: FetchedPackage) => {
+        return {
+          name: p.extractedFiles.manifest?.name,
+          version: p.extractedFiles.manifest?.version,
+          files: p.extractedFiles.files.length,
+        }
+      }),
+      allFiles: r.totalFiles,
+      timings: r.timings,
+    }
+  }) || []
+})
+
+const fileNames = props.files.map(f => f.name)
 onMounted(async () => {
   fsMap = await createDefaultMapFromCDN({ target: ts.ScriptTarget.ES2022 }, "5.9.2", true, ts)
   system = createSystem(fsMap)
-  fsMap.set("package.json", '{"name": "playground", "version": "1.0.0", "dependencies": {"leftpad": "1.0.0"}}')
-  fsMap.set("index.ts", 'const a: number = "Definitely not a number";')
+  fsMap.set("package.json", props.packageJson)
+  props.files.forEach((file) => {
+    fsMap.set(file.name, file.content)
+  })
 })
 
 // You can then interact with the languageService to introspect the code
@@ -45,15 +63,24 @@ const resolve = async () => {
   const host = createVirtualCompilerHost(system, compilerOpts, ts);
   const program = ts.createProgram(fileNames, compilerOpts, host.compilerHost);
   
-  const resolveResult = await webpm.installAndFetch(alias.value, {
-    version: bareSpecifier.value,
-    onResult: (dependency: FetchedPackage) => {
-      const name = dependency.extractedFiles.manifest?.name;
-      dependency.extractedFiles.files.forEach((file: ExtractedFile) => {
-        fsMap.set(`/node_modules/${name}/${file.name}`, file.buffer.toString());
-      });
-    }
+  result.value = await webpm.resolveAndFetchPackageJson(JSON.parse(props.packageJson), {
+    // version: props.packageJson.version,
+    // onResult: (dependency: FetchedPackage) => {
+    //   const name = dependency.extractedFiles.manifest?.name;
+    //   dependency.extractedFiles.files.forEach((file: ExtractedFile) => {
+    //     fsMap.set(`/node_modules/${name}/${file.name}`, file.buffer.toString());
+    //   });
+    // }
   })
+
+  result.value.forEach((r: FetchedDependencyTree) => {
+    r.allFetchedPackages.forEach((p: FetchedPackage) => {
+      p.extractedFiles.files.forEach((file: ExtractedFile) => {
+        console.log(p.package.name, file.name)
+        // fsMap.set(`/node_modules/${p.package.name}/${file.name}`, file.buffer.toString());
+      });
+    });
+  });
 
   // ts.Diagnostic contains circular references, so we need to safely stringify for display
   const rawDiagnostics = ts.getPreEmitDiagnostics(program);
@@ -64,14 +91,15 @@ const resolve = async () => {
       messageText: d.messageText.toString()
     }
   });
+  // result.value = JSON.stringify(resolveResult, null, 2);
 
   // const manifest = resolveResult
-  if (resolveResult?.timings) {
-    const formattedTimings = formatTimings(resolveResult.timings);
-    result.value = formattedTimings;
-  } else {
-    result.value = 'No timings available';
-  }
+  // if (resolveResult?.timings) {
+  //   const formattedTimings = formatTimings(resolveResult.timings);
+  //   result.value = formattedTimings;
+  // } else {
+  //   result.value = 'No timings available';
+  // }
 }
 
 const formatTimings = (timings: Record<string, any>) => {

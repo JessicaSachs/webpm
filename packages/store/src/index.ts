@@ -49,6 +49,26 @@ export interface WantedDependency {
   prevSpecifier?: string
 }
 
+export interface PackageJsonManifest {
+  name?: string
+  version?: string
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
+  optionalDependencies?: Record<string, string>
+  dependenciesMeta?: Record<string, { injected?: boolean, node?: string, patch?: string }>
+  // ... other package.json fields can be added as needed
+}
+
+export interface ResolvePackageJsonOptions {
+  includeDevDependencies?: boolean
+  includePeerDependencies?: boolean
+  includeOptionalDependencies?: boolean
+  autoInstallPeers?: boolean
+  maxConcurrent?: number
+  onResult?: (result: FetchedDependencyTree) => void
+}
+
 export interface ResolvedPackage {
   id: string // e.g., "nuxt@3.8.4"
   name: string
@@ -122,8 +142,9 @@ export async function requestPackage(
   context: ResolutionContext,
   _options: RequestPackageOptions = {}
 ): Promise<ResolvedPackage | null> {
+  // _options parameter is reserved for future use
   const { alias, bareSpecifier } = wantedDependency
-  const { registry, resolvedPackages, maxDepth = 10, currentDepth = 0, parentIds = [], onResult } = context
+  const { registry, resolvedPackages, maxDepth = 10, currentDepth = 0, parentIds = [] } = context
 
   // Check if we've already resolved this package
   const existingPackage = resolvedPackages.get(alias)
@@ -232,6 +253,93 @@ export function getNonDevWantedDependencies(packageManifest: PackageMetadata): W
   }
 
   return dependencies
+}
+
+/**
+ * Extract wanted dependencies from a package.json manifest (similar to pnpm's getWantedDependencies)
+ */
+export function getWantedDependenciesFromPackageJson(
+  packageJson: PackageJsonManifest,
+  options: ResolvePackageJsonOptions = {}
+): WantedDependency[] {
+  const {
+    includeDevDependencies = false,
+    includePeerDependencies = false,
+    includeOptionalDependencies = true,
+    autoInstallPeers = false
+  } = options
+
+  const wantedDeps: WantedDependency[] = []
+
+  // Add regular dependencies
+  if (packageJson.dependencies) {
+    for (const [alias, bareSpecifier] of Object.entries(packageJson.dependencies)) {
+      wantedDeps.push({
+        alias,
+        bareSpecifier,
+        dev: false,
+        optional: false,
+        prevSpecifier: bareSpecifier
+      })
+    }
+  }
+
+  // Add dev dependencies if requested
+  if (includeDevDependencies && packageJson.devDependencies) {
+    for (const [alias, bareSpecifier] of Object.entries(packageJson.devDependencies)) {
+      wantedDeps.push({
+        alias,
+        bareSpecifier,
+        dev: true,
+        optional: false,
+        prevSpecifier: bareSpecifier
+      })
+    }
+  }
+
+  // Add peer dependencies if requested
+  if (includePeerDependencies && packageJson.peerDependencies) {
+    for (const [alias, bareSpecifier] of Object.entries(packageJson.peerDependencies)) {
+      wantedDeps.push({
+        alias,
+        bareSpecifier,
+        dev: false,
+        optional: false,
+        prevSpecifier: bareSpecifier
+      })
+    }
+  }
+
+  // Add optional dependencies if requested
+  if (includeOptionalDependencies && packageJson.optionalDependencies) {
+    for (const [alias, bareSpecifier] of Object.entries(packageJson.optionalDependencies)) {
+      wantedDeps.push({
+        alias,
+        bareSpecifier,
+        dev: false,
+        optional: true,
+        prevSpecifier: bareSpecifier
+      })
+    }
+  }
+
+  // Auto-install peers if requested
+  if (autoInstallPeers && packageJson.peerDependencies) {
+    for (const [alias, bareSpecifier] of Object.entries(packageJson.peerDependencies)) {
+      // Only add if not already in dependencies
+      if (!packageJson.dependencies?.[alias] && !wantedDeps.some(dep => dep.alias === alias)) {
+        wantedDeps.push({
+          alias,
+          bareSpecifier,
+          dev: false,
+          optional: false,
+          prevSpecifier: bareSpecifier
+        })
+      }
+    }
+  }
+
+  return wantedDeps
 }
 
 /**
@@ -534,6 +642,68 @@ export async function fetchDependencyTree(
     logger.error(`Failed after ${timings.totalTime.toFixed(2)}ms`);
     return null;
   }
+}
+
+/**
+ * Resolve and fetch multiple packages from wanted dependencies
+ */
+export async function resolveAndFetchWantedDependencies(
+  wantedDependencies: WantedDependency[],
+  registry: NPMRegistry,
+  options: { maxConcurrent?: number, onResult?: (result: FetchedDependencyTree) => void } = {}
+): Promise<FetchedDependencyTree[]> {
+  const { maxConcurrent = 5, onResult } = options
+  
+  logger.info(`Resolving ${wantedDependencies.length} wanted dependencies`)
+
+  // Process packages in batches to control concurrency
+  const results: FetchedDependencyTree[] = []
+  const batches: WantedDependency[][] = []
+  
+  for (let i = 0; i < wantedDependencies.length; i += maxConcurrent) {
+    batches.push(wantedDependencies.slice(i, i + maxConcurrent))
+  }
+
+  for (const batch of batches) {
+    const batchPromises = batch.map(async (wantedDep) => {
+      try {
+        const depType = wantedDep.dev ? 'dev' : (wantedDep.optional ? 'optional' : 'prod')
+        logger.info(`Resolving ${depType} dependency: ${wantedDep.alias}@${wantedDep.bareSpecifier}`)
+        
+        const result = await resolveAndFetchPackage(
+          wantedDep.alias, 
+          wantedDep.bareSpecifier, 
+          registry, 
+          {
+            maxConcurrent,
+            onResult: onResult
+          }
+        )
+        
+        if (result) {
+          logger.info(`Successfully resolved ${wantedDep.alias}@${wantedDep.bareSpecifier} with ${result.totalPackages} packages`)
+          return result
+        } else {
+          logger.warn(`Failed to resolve ${wantedDep.alias}@${wantedDep.bareSpecifier}`)
+          return null
+        }
+      } catch (error) {
+        if (wantedDep.optional) {
+          logger.warn(`Optional dependency ${wantedDep.alias}@${wantedDep.bareSpecifier} failed:`, error)
+          return null
+        } else {
+          logger.error(`Error resolving ${wantedDep.alias}@${wantedDep.bareSpecifier}:`, error)
+          throw error
+        }
+      }
+    })
+
+    const batchResults = await Promise.all(batchPromises)
+    results.push(...batchResults.filter((result): result is FetchedDependencyTree => result !== null))
+  }
+
+  logger.info(`Successfully resolved ${results.length} wanted dependencies`)
+  return results
 }
 
 /**

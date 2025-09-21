@@ -15,64 +15,23 @@
       </a>
     </p>
 
-    <SomeComponent/>
+    <!-- <SomeComponent/> -->
+    <h1>Package JSON</h1>
+    <textarea v-model="packageJson" />
+
+    <h2>Main.ts</h2>
+    <textarea v-model="mainTs" />
     
-    <div class="npm-fetcher">
-      <h2>NPM Package Fetcher</h2>
-      <div class="input-group">
-        <input 
-          v-model="packageName" 
-          placeholder="Enter npm package name (e.g., vue, react, lodash)"
-          class="package-input"
-          @keyup.enter="fetchPackageInfo"
-        />
-        <button 
-          @click="fetchPackageInfo" 
-          :disabled="loading || !packageName.trim()"
-          class="fetch-button"
-        >
-          {{ loading ? 'Fetching...' : 'Fetch Package' }}
-        </button>
-      </div>
-      
-      <div v-if="error" class="error-message">
-        {{ error }}
-      </div>
-      
-      <div v-if="packageInfo" class="package-info">
-        <h3>{{ packageInfo.name }}</h3>
-        <p class="package-description">{{ packageInfo.description }}</p>
-        <div class="package-details">
-          <span class="detail-item">
-            <strong>Version:</strong> {{ packageInfo.version }}
-          </span>
-          <span class="detail-item">
-            <strong>License:</strong> {{ packageInfo.license }}
-          </span>
-          <span v-if="packageInfo.author" class="detail-item">
-            <strong>Author:</strong> {{ packageInfo.author.name }}
-          </span>
-          <span v-if="packageInfo.homepage" class="detail-item">
-            <strong>Homepage:</strong> 
-            <a :href="packageInfo.homepage" target="_blank" rel="noopener noreferrer">
-              {{ packageInfo.homepage }}
-            </a>
-          </span>
-        </div>
-        <div v-if="packageInfo.keywords && packageInfo.keywords.length > 0" class="keywords">
-          <strong>Keywords:</strong>
-          <span v-for="keyword in packageInfo.keywords.slice(0, 10)" :key="keyword" class="keyword">
-            {{ keyword }}
-          </span>
-        </div>
-      </div>
-    </div>
+    <SomeComponent :packageJson="packageJson" :files="[{name: 'main.ts', content: mainTs}]" />
+    <Suspense><TypeScriptVFSDemo :packageJson="packageJson" :files="[{name: 'main.ts', content: mainTs}]" /></Suspense>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
 import SomeComponent from './SomeComponent.vue';
+import TypeScriptVFSDemo from './TypeScriptVFSDemo.vue';
 import { webpm, type PackageInfo } from '@webpm/webpm';
 
 // Reactive state
@@ -80,6 +39,10 @@ const packageName = ref('');
 const packageInfo = ref<PackageInfo | null>(null);
 const loading = ref(false);
 const error = ref('');
+
+const mainTs = ref('const a: number = "Definitely not a number";');
+
+const packageJson = ref('{"name": "playground", "version": "1.0.0", "dependencies": {"vue": "3.5.21"}}');
 
 // Methods
 const fetchPackageInfo = async () => {

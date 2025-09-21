@@ -5,8 +5,12 @@ import type { PackageMetadata } from '@webpm/registry'
 import { 
   resolvePackageTree, 
   resolveAndFetchPackage,
+  resolveAndFetchWantedDependencies,
+  getWantedDependenciesFromPackageJson,
   type DependencyTreeNode, 
-  type FetchedDependencyTree
+  type FetchedDependencyTree,
+  type PackageJsonManifest,
+  type ResolvePackageJsonOptions
 } from '@webpm/store'
 
 export interface PackageVersion {
@@ -121,7 +125,7 @@ export class WebPM {
   }
 
   init(): Promise<void> {
-    return Promise.all([this.registry.init()]).then(([registry]) => {
+    return this.registry.init().then((registry) => {
       logger.info('WebPM initialized', { config: this.config, registry })
     })
   }
@@ -273,7 +277,6 @@ export class WebPM {
         maxRetries: this.config.retries,
       })
       
-      debugger
       // Resolve, fetch, and extract all packages
       const fetchedTree = await resolveAndFetchPackage(
         packageName,
@@ -306,6 +309,76 @@ export class WebPM {
 
     } catch (error) {
       logger.error(`Failed to install and fetch package ${packageName}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * Resolve and fetch all dependencies from a package.json file
+   * @param packageJson - The package.json manifest object
+   * @param options - Resolution options
+   */
+  async resolveAndFetchPackageJson(
+    packageJson: PackageJsonManifest,
+    options: ResolvePackageJsonOptions = {}
+  ): Promise<FetchedDependencyTree[]> {
+    logger.info('Resolving and fetching package.json dependencies', { 
+      packageName: packageJson.name, 
+      options 
+    })
+
+    try {
+      // Create registry instance
+      const registry = new NPMRegistry({
+        url: this.config.registry,
+        timeout: this.config.timeout,
+        maxRetries: this.config.retries,
+      })
+
+      // Extract wanted dependencies from package.json
+      const wantedDependencies = getWantedDependenciesFromPackageJson(packageJson, options)
+      
+      if (wantedDependencies.length === 0) {
+        logger.info('No dependencies found in package.json')
+        return []
+      }
+
+      logger.info(`Found ${wantedDependencies.length} dependencies to resolve:`)
+      for (const dep of wantedDependencies) {
+        const depType = dep.dev ? 'dev' : (dep.optional ? 'optional' : 'prod')
+        logger.info(`  ${depType}: ${dep.alias}@${dep.bareSpecifier}`)
+      }
+
+      // Resolve and fetch all wanted dependencies
+      const results = await resolveAndFetchWantedDependencies(
+        wantedDependencies,
+        registry,
+        {
+          maxConcurrent: options.maxConcurrent || this.config.concurrency,
+          onResult: options.onResult
+        }
+      )
+
+      // Calculate summary statistics
+      const totalPackages = results.reduce((sum, result) => sum + result.totalPackages, 0)
+      const totalFiles = results.reduce((sum, result) => sum + result.totalFiles, 0)
+      const totalTime = results.reduce((max, result) => Math.max(max, result.timings.totalTime), 0)
+
+      logger.info(`Successfully resolved and fetched package.json dependencies:`)
+      logger.info(`  Root dependencies resolved: ${results.length}`)
+      logger.info(`  Total packages: ${totalPackages}`)
+      logger.info(`  Total files: ${totalFiles}`)
+      logger.info(`  Total time: ${totalTime.toFixed(2)}ms`)
+
+      // Log per-dependency summary
+      for (const result of results) {
+        logger.info(`  ${result.root.package.name}@${result.root.package.version}: ${result.totalPackages} packages, ${result.totalFiles} files`)
+      }
+
+      return results
+
+    } catch (error) {
+      logger.error(`Failed to resolve and fetch package.json dependencies:`, error)
       throw error
     }
   }
@@ -468,3 +541,4 @@ export class WebPM {
 export const webpm = new WebPM()
 
 export * from '@webpm/store'
+export type { PackageJsonManifest, ResolvePackageJsonOptions } from '@webpm/store'
