@@ -21,6 +21,9 @@
     "turbo": "catalog:",
     "vitest": "catalog:"
   },
+  "resolutions": {
+    "unimport": "4.1.1"
+  },
   "packageManager": "pnpm@10.15.1",
   "engines": {
     "node": ">=18"
