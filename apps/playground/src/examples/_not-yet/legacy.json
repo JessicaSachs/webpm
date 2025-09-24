@@ -1,0 +1,30 @@
+{
+  "name": "legacy-project",
+  "version": "1.0.0",
+  "description": "A legacy Node.js project with older dependencies",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "mocha test/",
+    "lint": "jshint ."
+  },
+  "dependencies": {
+    "express": "^4.16.4",
+    "body-parser": "^1.18.3",
+    "cors": "^2.8.5",
+    "mongoose": "^5.7.13",
+    "bcrypt": "^3.0.6",
+    "jsonwebtoken": "^8.5.1",
+    "lodash": "^4.17.11",
+    "moment": "^2.24.0"
+  },
+  "devDependencies": {
+    "mocha": "^6.2.0",
+    "chai": "^4.2.0",
+    "jshint": "^2.10.2",
+    "nodemon": "^1.19.1"
+  },
+  "engines": {
+    "node": ">=10.0.0"
+  }
+}

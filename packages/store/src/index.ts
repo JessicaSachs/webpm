@@ -37,6 +37,285 @@ function createTimings(): InstallationTimings {
   }
 }
 
+// IndexedDB File Content Store
+export interface StoredFileContent {
+  id: string // packageName@version/filePath
+  packageName: string
+  packageVersion: string
+  filePath: string
+  content: string
+  size: number
+  mtime?: Date
+  contentType: string
+}
+
+export class FileContentStore {
+  private dbName = 'webpm-file-store'
+  private dbVersion = 1
+  private storeName = 'file-contents'
+  private db: IDBDatabase | null = null
+
+  async init(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.dbVersion)
+      
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        this.db = request.result
+        resolve()
+      }
+      
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          const store = db.createObjectStore(this.storeName, { keyPath: 'id' })
+          
+          // Create indexes for efficient querying
+          store.createIndex('packageName', 'packageName', { unique: false })
+          store.createIndex('packageVersion', 'packageVersion', { unique: false })
+          store.createIndex('filePath', 'filePath', { unique: false })
+          store.createIndex('contentType', 'contentType', { unique: false })
+        }
+      }
+    })
+  }
+
+  async storeFileContent(fileContent: StoredFileContent): Promise<void> {
+    if (!this.db) await this.init()
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readwrite')
+      const store = transaction.objectStore(this.storeName)
+      const request = store.put(fileContent)
+      
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => resolve()
+    })
+  }
+
+  async getFileContent(id: string): Promise<StoredFileContent | null> {
+    if (!this.db) await this.init()
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readonly')
+      const store = transaction.objectStore(this.storeName)
+      const request = store.get(id)
+      
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => resolve(request.result || null)
+    })
+  }
+
+  async getPackageFiles(packageName: string, packageVersion?: string): Promise<StoredFileContent[]> {
+    if (!this.db) await this.init()
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readonly')
+      const store = transaction.objectStore(this.storeName)
+      const index = store.index('packageName')
+      const request = index.getAll(packageName)
+      
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        let results = request.result
+        
+        if (packageVersion) {
+          results = results.filter(file => file.packageVersion === packageVersion)
+        }
+        
+        resolve(results)
+      }
+    })
+  }
+
+  async clearPackageFiles(packageName: string, packageVersion?: string): Promise<void> {
+    if (!this.db) await this.init()
+    
+    const filesToDelete = await this.getPackageFiles(packageName, packageVersion)
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readwrite')
+      const store = transaction.objectStore(this.storeName)
+      
+      let completed = 0
+      const total = filesToDelete.length
+      
+      if (total === 0) {
+        resolve()
+        return
+      }
+      
+      for (const file of filesToDelete) {
+        const request = store.delete(file.id)
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          completed++
+          if (completed === total) resolve()
+        }
+      }
+    })
+  }
+
+  async clearAll(): Promise<void> {
+    if (!this.db) await this.init()
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readwrite')
+      const store = transaction.objectStore(this.storeName)
+      const request = store.clear()
+      
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => resolve()
+    })
+  }
+
+  async getAllFiles(): Promise<StoredFileContent[]> {
+    if (!this.db) await this.init()
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readonly')
+      const store = transaction.objectStore(this.storeName)
+      const request = store.getAll()
+      
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => resolve(request.result || [])
+    })
+  }
+
+  async getFilesByType(contentType: string): Promise<StoredFileContent[]> {
+    if (!this.db) await this.init()
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readonly')
+      const store = transaction.objectStore(this.storeName)
+      const index = store.index('contentType')
+      const request = index.getAll(contentType)
+      
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => resolve(request.result || [])
+    })
+  }
+
+  async getTypeScriptFiles(): Promise<StoredFileContent[]> {
+    const allFiles = await this.getAllFiles()
+    return allFiles.filter(file => 
+      file.contentType === 'application/typescript' ||
+      file.filePath.endsWith('.ts') ||
+      file.filePath.endsWith('.tsx') ||
+      file.filePath.endsWith('.d.ts')
+    )
+  }
+
+  async getJavaScriptFiles(): Promise<StoredFileContent[]> {
+    const allFiles = await this.getAllFiles()
+    return allFiles.filter(file => 
+      file.contentType === 'application/javascript' ||
+      file.filePath.endsWith('.js') ||
+      file.filePath.endsWith('.jsx') ||
+      file.filePath.endsWith('.mjs') ||
+      file.filePath.endsWith('.cjs')
+    )
+  }
+}
+
+// Global file content store instance
+export const fileContentStore = new FileContentStore()
+
+/**
+ * Helper function to determine content type from file extension
+ */
+function getContentType(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase()
+  
+  switch (ext) {
+    case 'js':
+    case 'mjs':
+    case 'cjs':
+      return 'application/javascript'
+    case 'ts':
+    case 'tsx':
+      return 'application/typescript'
+    case 'json':
+      return 'application/json'
+    case 'css':
+      return 'text/css'
+    case 'html':
+    case 'htm':
+      return 'text/html'
+    case 'md':
+      return 'text/markdown'
+    case 'txt':
+      return 'text/plain'
+    case 'yml':
+    case 'yaml':
+      return 'application/yaml'
+    case 'xml':
+      return 'application/xml'
+    case 'vue':
+      return 'text/x-vue'
+    default:
+      return 'text/plain'
+  }
+}
+
+/**
+ * Helper function to check if a file should be stored (text files only)
+ */
+function shouldStoreFile(filePath: string, size: number): boolean {
+  // Skip very large files (>1MB)
+  if (size > 1024 * 1024) return false
+  
+  const ext = filePath.split('.').pop()?.toLowerCase()
+  const textExtensions = [
+    'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx',
+    'json', 'css', 'scss', 'sass', 'less',
+    'html', 'htm', 'xml', 'svg',
+    'md', 'txt', 'yml', 'yaml',
+    'vue', 'svelte',
+    'd.ts', 'map'
+  ]
+  
+  return textExtensions.includes(ext || '')
+}
+
+/**
+ * Store extracted file contents in IndexedDB
+ */
+async function storeExtractedFiles(fetchedPackage: FetchedPackage): Promise<void> {
+  try {
+    const packageName = fetchedPackage.package.name
+    const packageVersion = fetchedPackage.package.version
+    
+    for (const file of fetchedPackage.extractedFiles.files) {
+      if (!shouldStoreFile(file.name, file.size)) continue
+      
+      try {
+        const content = file.buffer.toString('utf-8')
+        const fileContent: StoredFileContent = {
+          id: `${packageName}@${packageVersion}/${file.name}`,
+          packageName,
+          packageVersion,
+          filePath: file.name,
+          content,
+          size: file.size,
+          mtime: file.mtime,
+          contentType: getContentType(file.name)
+        }
+        
+        await fileContentStore.storeFileContent(fileContent)
+      } catch {
+        // Skip files that can't be converted to UTF-8
+        logger.debug(`Skipping non-text file: ${file.name}`)
+      }
+    }
+    
+    logger.debug(`Stored file contents for ${packageName}@${packageVersion}`)
+  } catch (error) {
+    logger.warn(`Failed to store file contents for ${fetchedPackage.package.id}:`, error)
+  }
+}
+
 // Types for dependency resolution
 export interface WantedDependency {
   alias: string
@@ -588,6 +867,10 @@ export async function fetchDependencyTree(
           options.onResult?.(fetched);
           allFetchedPackages.set(pkg.id, fetched);
           totalFiles += fetched.extractedFiles.files.length;
+          
+          // Store file contents in IndexedDB
+          await storeExtractedFiles(fetched);
+          
           logger.debug(`Fetched ${pkg.id} in ${packageTime.toFixed(2)}ms`);
         }
         return fetched;
@@ -675,13 +958,19 @@ export async function resolveAndFetchWantedDependencies(
           wantedDep.bareSpecifier, 
           registry, 
           {
-            maxConcurrent,
-            onResult: onResult
+            maxConcurrent
+            // Don't pass onResult here, we'll call it after each result
           }
         )
         
         if (result) {
           logger.info(`Successfully resolved ${wantedDep.alias}@${wantedDep.bareSpecifier} with ${result.totalPackages} packages`)
+          
+          // Call the onResult callback with the fetched tree
+          if (onResult) {
+            onResult(result)
+          }
+          
           return result
         } else {
           logger.warn(`Failed to resolve ${wantedDep.alias}@${wantedDep.bareSpecifier}`)
@@ -735,7 +1024,10 @@ export async function resolveAndFetchPackage(
     logger.info(`Dependency resolution completed in ${timings.resolutionTime.toFixed(2)}ms`);
 
     // Phase 2: Fetch all packages
-    const fetchedTree = await fetchDependencyTree(dependencyTree, options);
+    const fetchedTree = await fetchDependencyTree(dependencyTree, { 
+      maxConcurrent: options.maxConcurrent 
+      // Don't pass onResult here, we'll call it after the tree is complete
+    });
     
     if (!fetchedTree) {
       logger.error(`Failed to fetch packages for ${packageName}@${packageVersion}`);
@@ -764,6 +1056,11 @@ export async function resolveAndFetchPackage(
     logger.info(`  Extraction: ${timings.extractionTime.toFixed(2)}ms (${((timings.extractionTime / timings.totalTime) * 100).toFixed(1)}%)`);
     logger.info(`  Tree building: ${timings.phases.treeBuilding.toFixed(2)}ms`);
     logger.info(`  Average per package: ${(timings.fetchingTime / fetchedTree.totalPackages).toFixed(2)}ms`);
+
+    // Call the onResult callback with the complete fetched tree
+    if (options.onResult) {
+      options.onResult(fetchedTree);
+    }
 
     return fetchedTree;
 

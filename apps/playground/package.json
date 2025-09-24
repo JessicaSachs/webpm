@@ -1,33 +1,36 @@
 {
   "name": "playground",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
+  "private": true,
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
-    "lint": "eslint .",
-    "typecheck": "nuxt typecheck"
+    "build": "vite build",
+    "dev": "vite --host 0.0.0.0 --port 3001 --clearScreen false",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src/ --max-warnings 0"
   },
   "dependencies": {
-    "@iconify-json/lucide": "^1.2.68",
-    "@iconify-json/simple-icons": "^1.2.52",
-    "@iconify-json/vscode-icons": "^1.1.0",
-    "@nuxt/ui": "^4.0.0-alpha.2",
+    "@nuxt/ui": "4.0.0-alpha.2",
+    "@typescript/vfs": "^1.6.1",
+    "@unhead/vue": "^2.0.17",
     "@webpm/npm-resolver": "workspace:*",
     "@webpm/webpm": "workspace:*",
-    "nuxt": "^4.1.2",
-    "nuxt-monaco-editor": "1.4.0",
-    "tailwindcss": "^4.1.13"
+    "date-fns": "^4.1.0",
+    "fflate": "^0.8.2",
+    "monaco-editor": "^0.53.0",
+    "tar-stream": "^3.1.7",
+    "vue": "^3.5.21",
+    "vue-router": "^4.5.1"
   },
   "devDependencies": {
-    "@nuxt/eslint": "^1.9.0",
+    "@vitejs/plugin-vue": "catalog:",
     "@webpm/eslint-config": "workspace:*",
     "@webpm/typescript-config": "workspace:*",
     "eslint": "catalog:",
+    "rollup-plugin-natives": "^0.7.8",
+    "rollup-plugin-polyfill-node": "^0.13.0",
     "typescript": "catalog:",
-    "vue-tsc": "^3.0.7"
+    "vite": "catalog:",
+    "vite-plugin-node-polyfills": "^0.24.0"
   }
 }

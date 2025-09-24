@@ -9,6 +9,7 @@ import {
   getWantedDependenciesFromPackageJson,
   type DependencyTreeNode, 
   type FetchedDependencyTree,
+  type FetchedPackage,
   type PackageJsonManifest,
   type ResolvePackageJsonOptions
 } from '@webpm/store'
@@ -32,6 +33,51 @@ export interface InstallOptions {
   cache?: boolean
   registry?: string
   onResult?: (result: FetchedDependencyTree) => void
+}
+
+export interface UntarProgressEvent {
+  type: 'package-extracted' | 'batch-complete' | 'installation-complete'
+  packageName?: string
+  packageVersion?: string
+  extractedFiles?: number
+  currentProgress: {
+    totalPackages: number
+    totalFiles: number
+    totalSize: number
+    completedPackages: number
+  }
+  batchInfo?: {
+    batchIndex: number
+    batchTotal: number
+    packagesInBatch: number
+  }
+}
+
+export interface UntarHandler {
+  onProgress?: (event: UntarProgressEvent) => void
+  onComplete?: (result: InstallationResult) => void
+  onError?: (error: Error) => void
+}
+
+export interface InstallationResult {
+  success: boolean
+  totalPackages: number
+  totalFiles: number
+  totalSize: number
+  allPackages: FetchedPackage[]
+  timings: {
+    totalTime: number
+    resolutionTime: number
+    fetchingTime: number
+    extractionTime: number
+  }
+  statistics: {
+    averageExtractionTime: number
+    fastestExtraction: number
+    slowestExtraction: number
+    largestPackage: { name: string; size: number }
+    smallestPackage: { name: string; size: number }
+  }
 }
 
 export interface WebpmConfig {
@@ -283,7 +329,6 @@ export class WebPM {
         options.version || 'latest',
         registry,
         {
-          onResult: options.onResult,
           maxDepth: 10,
           maxConcurrent: options.maxConcurrent || this.config.concurrency,
         }
@@ -310,6 +355,217 @@ export class WebPM {
     } catch (error) {
       logger.error(`Failed to install and fetch package ${packageName}:`, error)
       throw error
+    }
+  }
+
+  /**
+   * Install packages with proper untar handling and accurate metrics
+   * @param packageJson - The package.json manifest object
+   * @param handler - Untar handler for progress and completion callbacks
+   * @param options - Resolution options
+   */
+  async installWithUntarHandler(
+    packageJson: PackageJsonManifest,
+    handler: UntarHandler = {},
+    options: ResolvePackageJsonOptions = {}
+  ): Promise<InstallationResult> {
+    const startTime = performance.now()
+    
+    try {
+      logger.info('Starting installation with untar handler', { 
+        packageName: packageJson.name,
+        options 
+      })
+
+      // Create registry instance
+      const registry = new NPMRegistry({
+        url: this.config.registry,
+        timeout: this.config.timeout,
+        maxRetries: this.config.retries,
+      })
+
+      // Extract wanted dependencies from package.json
+      const wantedDependencies = getWantedDependenciesFromPackageJson(packageJson, options)
+      
+      if (wantedDependencies.length === 0) {
+        const result: InstallationResult = {
+          success: true,
+          totalPackages: 0,
+          totalFiles: 0,
+          totalSize: 0,
+          allPackages: [],
+          timings: {
+            totalTime: performance.now() - startTime,
+            resolutionTime: 0,
+            fetchingTime: 0,
+            extractionTime: 0
+          },
+          statistics: {
+            averageExtractionTime: 0,
+            fastestExtraction: 0,
+            slowestExtraction: 0,
+            largestPackage: { name: '', size: 0 },
+            smallestPackage: { name: '', size: 0 }
+          }
+        }
+        
+        handler.onComplete?.(result)
+        return result
+      }
+
+      // Collect all packages from all dependency trees
+      const allPackages: FetchedPackage[] = []
+      let totalResolutionTime = 0
+      let totalFetchingTime = 0
+      let totalExtractionTime = 0
+
+      // Process dependencies with progress tracking
+      for (let i = 0; i < wantedDependencies.length; i++) {
+        const wantedDep = wantedDependencies[i]
+        const depType = wantedDep.dev ? 'dev' : (wantedDep.optional ? 'optional' : 'prod')
+        
+        logger.info(`Processing ${depType} dependency: ${wantedDep.alias}@${wantedDep.bareSpecifier}`)
+        
+        try {
+          const result = await resolveAndFetchPackage(
+            wantedDep.alias, 
+            wantedDep.bareSpecifier, 
+            registry, 
+            {
+              maxConcurrent: options.maxConcurrent || this.config.concurrency
+            }
+          )
+          
+          if (result && result.allFetchedPackages) {
+            const packages = Array.from(result.allFetchedPackages.values())
+            allPackages.push(...packages)
+            
+            // Accumulate timing
+            totalResolutionTime += result.timings.resolutionTime
+            totalFetchingTime += result.timings.fetchingTime
+            totalExtractionTime += result.timings.extractionTime
+            
+            // Send progress event for each package
+            for (const pkg of packages) {
+              const currentProgress = this.calculateCurrentProgress(allPackages)
+              
+              handler.onProgress?.({
+                type: 'package-extracted',
+                packageName: pkg.package.name,
+                packageVersion: pkg.package.version,
+                extractedFiles: pkg.extractedFiles.files.length,
+                currentProgress
+              })
+            }
+            
+            // Send batch complete event
+            handler.onProgress?.({
+              type: 'batch-complete',
+              currentProgress: this.calculateCurrentProgress(allPackages),
+              batchInfo: {
+                batchIndex: i + 1,
+                batchTotal: wantedDependencies.length,
+                packagesInBatch: packages.length
+              }
+            })
+          }
+        } catch (error) {
+          if (wantedDep.optional) {
+            logger.warn(`Optional dependency ${wantedDep.alias}@${wantedDep.bareSpecifier} failed:`, error)
+          } else {
+            throw error
+          }
+        }
+      }
+
+      // Calculate final statistics
+      const totalTime = performance.now() - startTime
+      const statistics = this.calculateStatistics(allPackages)
+      const currentProgress = this.calculateCurrentProgress(allPackages)
+      
+      const installationResult: InstallationResult = {
+        success: true,
+        totalPackages: currentProgress.totalPackages,
+        totalFiles: currentProgress.totalFiles,
+        totalSize: currentProgress.totalSize,
+        allPackages,
+        timings: {
+          totalTime,
+          resolutionTime: totalResolutionTime,
+          fetchingTime: totalFetchingTime,
+          extractionTime: totalExtractionTime
+        },
+        statistics
+      }
+
+      // Send final completion event
+      handler.onProgress?.({
+        type: 'installation-complete',
+        currentProgress
+      })
+      
+      handler.onComplete?.(installationResult)
+      
+      logger.info(`Installation complete: ${installationResult.totalPackages} packages, ${installationResult.totalFiles} files`)
+      return installationResult
+      
+    } catch (error) {
+      const installationError = error instanceof Error ? error : new Error('Unknown installation error')
+      handler.onError?.(installationError)
+      throw installationError
+    }
+  }
+
+  /**
+   * Calculate current progress statistics
+   */
+  private calculateCurrentProgress(allPackages: FetchedPackage[]) {
+    const totalFiles = allPackages.reduce((sum, pkg) => sum + pkg.extractedFiles.files.length, 0)
+    const totalSize = allPackages.reduce((sum, pkg) => {
+      return sum + pkg.extractedFiles.files.reduce((fileSum: number, file: any) => fileSum + file.size, 0)
+    }, 0)
+    
+    return {
+      totalPackages: allPackages.length,
+      totalFiles,
+      totalSize,
+      completedPackages: allPackages.length
+    }
+  }
+
+  /**
+   * Calculate extraction statistics
+   */
+  private calculateStatistics(allPackages: FetchedPackage[]) {
+    if (allPackages.length === 0) {
+      return {
+        averageExtractionTime: 0,
+        fastestExtraction: 0,
+        slowestExtraction: 0,
+        largestPackage: { name: '', size: 0 },
+        smallestPackage: { name: '', size: 0 }
+      }
+    }
+
+    const extractionTimes = allPackages
+      .map(pkg => pkg.timings.extractionTime)
+      .filter(time => time > 0)
+
+    const packageSizes = allPackages.map(pkg => ({
+      name: `${pkg.package.name}@${pkg.package.version}`,
+      size: pkg.extractedFiles.files.reduce((sum: number, file: any) => sum + file.size, 0)
+    }))
+
+    const sortedSizes = packageSizes.sort((a, b) => b.size - a.size)
+
+    return {
+      averageExtractionTime: extractionTimes.length > 0 
+        ? extractionTimes.reduce((sum, time) => sum + time, 0) / extractionTimes.length 
+        : 0,
+      fastestExtraction: extractionTimes.length > 0 ? Math.min(...extractionTimes) : 0,
+      slowestExtraction: extractionTimes.length > 0 ? Math.max(...extractionTimes) : 0,
+      largestPackage: sortedSizes[0] || { name: '', size: 0 },
+      smallestPackage: sortedSizes[sortedSizes.length - 1] || { name: '', size: 0 }
     }
   }
 
@@ -354,8 +610,7 @@ export class WebPM {
         wantedDependencies,
         registry,
         {
-          maxConcurrent: options.maxConcurrent || this.config.concurrency,
-          onResult: options.onResult
+          maxConcurrent: options.maxConcurrent || this.config.concurrency
         }
       )
 
