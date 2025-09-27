@@ -157,7 +157,7 @@ export class TarballFetcher {
           stream.on("end", () => {
             const fileBuffer = Buffer.concat(chunks);
 
-            const name = header.name.replace(/^package\//, '');
+            const name = header.name.split('/').slice(1).join('/');
             const extractedFile: ExtractedFile = {
               name, // Normalize the name from the tarball
               buffer: fileBuffer,

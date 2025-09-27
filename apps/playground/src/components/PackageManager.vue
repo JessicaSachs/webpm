@@ -22,7 +22,7 @@
         </div>
       </div>
     </template>
-    
+
     <!-- Content -->
     <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
       <!-- Package.json Installation Section -->
@@ -347,7 +347,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { webpm } from '@webpm/webpm'
 import type { InstallationResult, UntarProgressEvent } from '@webpm/webpm'
 import { fileContentStore } from '@webpm/store'
@@ -475,6 +475,13 @@ const installFromPackageJson = async () => {
         onError: (err: Error) => {
           error.value = err.message
         },
+      },
+      {
+        // Include devDependencies by default when installing from package.json
+        includeDevDependencies: true,
+        includeOptionalDependencies: true,
+        includePeerDependencies: false,
+        autoInstallPeers: false,
       }
     )
 
@@ -590,11 +597,15 @@ const addToTypeScriptVFS = async () => {
       file.filePath.endsWith('.d.ts') ||
       file.filePath.endsWith('.js') ||
       file.filePath.endsWith('.jsx') ||
-      file.filePath.endsWith('.json')
+      file.filePath.endsWith('.json') ||
+      file.filePath.endsWith('.mts') ||
+      file.filePath.endsWith('.cts') ||
+      file.filePath.endsWith('.mjs') ||
+      file.filePath.endsWith('.cjs')
     )
     
     console.log(`Found ${relevantFiles.length} relevant files for VFS`)
-    
+  
     // Clear existing VFS files display
     vfsFiles.value.clear()
     
@@ -603,12 +614,6 @@ const addToTypeScriptVFS = async () => {
       const vfsPath = `/node_modules/${file.packageName}/${file.filePath}`
       vfsFiles.value.set(vfsPath, file.content)
       fsMap.value.set(vfsPath, file.content)
-      
-      // Also add package.json files if they exist
-      if (file.filePath === 'package.json') {
-        const packagePath = `/node_modules/${file.packageName}/package.json`
-        fsMap.value.set(packagePath, file.content)
-      }
     }
     
     // Use content from the Monaco editor or fallback to default content
@@ -636,6 +641,7 @@ export const testValue = 'This is a test';
     
     // Add a basic tsconfig.json
     const tsconfigContent = `{
+    "rootDir": ".",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -647,10 +653,12 @@ export const testValue = 'This is a test';
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
-    "exactOptionalPropertyTypes": true
+    "exactOptionalPropertyTypes": true,
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "resolveJsonModule": true
   },
-  "include": ["**/*"],
-  "exclude": ["node_modules"]
+
 }`
     
     vfsFiles.value.set('/tsconfig.json', tsconfigContent)
@@ -670,6 +678,10 @@ export const testValue = 'This is a test';
     console.log(`Total VFS files: ${vfsFiles.value.size}`)
     console.log(`Total fsMap files: ${fsMap.value.size}`)
     
+    // Debug: Log @types packages specifically
+    const typesFiles = Array.from(fsMap.value.keys()).filter(path => path.includes('@types'))
+    console.log('Found @types files in VFS:', typesFiles)
+  
     // Create real TypeScript environment and diagnostics
     await createTypeScriptProgram()
     
@@ -695,7 +707,7 @@ const createTypeScriptProgram = async () => {
       moduleResolution: ts.ModuleResolutionKind.NodeJs,
       strict: true,
       esModuleInterop: true,
-      skipLibCheck: false,
+      skipLibCheck: true, // Skip checking .d.ts files to reduce noise
       forceConsistentCasingInFileNames: true,
       noImplicitAny: true,
       noImplicitReturns: true,
@@ -703,6 +715,13 @@ const createTypeScriptProgram = async () => {
       exactOptionalPropertyTypes: true,
       allowSyntheticDefaultImports: true,
       isolatedModules: true,
+      // Enable resolution of .d.ts files
+      declaration: true,
+      // Better module resolution for types
+      resolveJsonModule: true,
+      // Reduce noise from missing files
+      noResolve: false,
+      allowJs: true,
     }
     
     // Create the virtual TypeScript environment
@@ -735,14 +754,32 @@ const createTypeScriptProgram = async () => {
     allDiagnostics.push(...compilerOptionsDiagnostics)
     
     
-    // Also check other TypeScript files in the VFS
-    for (const [filePath] of vfsFiles.value) {
-      if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
+    // Only analyze the main application files, let TypeScript resolve dependencies automatically
+    const mainFiles = ['/main.ts', '/tsconfig.json']
+    
+    for (const filePath of mainFiles) {
+      if (fsMap.value.has(filePath)) {
         try {
           const fileDiagnostics = languageService.getSemanticDiagnostics(filePath)
           allDiagnostics.push(...fileDiagnostics)
+          console.log(`Successfully analyzed ${filePath}: ${fileDiagnostics.length} diagnostics`)
         } catch (error) {
-          console.warn(`Could not get diagnostics for ${filePath}:`, error)
+          console.warn(`Could not analyze ${filePath}:`, error)
+        }
+      }
+    }
+    
+    // Also try to analyze any files that were loaded from the Monaco editor
+    for (const [filePath] of vfsFiles.value) {
+      // Only analyze non-library files
+      if (!filePath.includes('/node_modules/') && 
+          (filePath.endsWith('.ts') || filePath.endsWith('.tsx'))) {
+        try {
+          const fileDiagnostics = languageService.getSemanticDiagnostics(filePath)
+          allDiagnostics.push(...fileDiagnostics)
+          console.log(`Successfully analyzed user file ${filePath}: ${fileDiagnostics.length} diagnostics`)
+        } catch (error) {
+          console.warn(`Could not analyze user file ${filePath}:`, error)
         }
       }
     }
