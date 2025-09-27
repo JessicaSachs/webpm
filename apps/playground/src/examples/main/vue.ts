@@ -1,5 +1,13 @@
 // Vue.js App Example - TypeScript exercises
-import { createApp, ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import {
+  createApp,
+  ref,
+  reactive,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+} from 'vue'
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import { createPinia } from 'pinia'
 import axios from 'axios'
@@ -89,14 +97,14 @@ const useAppStore = defineStore('app', () => {
   }
 
   const updatePost = (id: number, updatedPost: Partial<Post>) => {
-    const index = posts.value.findIndex(p => p.id === id)
+    const index = posts.value.findIndex((p) => p.id === id)
     if (index !== -1) {
       posts.value[index] = { ...posts.value[index], ...updatedPost }
     }
   }
 
   const deletePost = (id: number) => {
-    posts.value = posts.value.filter(p => p.id !== id)
+    posts.value = posts.value.filter((p) => p.id !== id)
   }
 
   const fetchPosts = async () => {
@@ -116,7 +124,10 @@ const useAppStore = defineStore('app', () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await axios.post<ApiResponse<Post>>('/api/posts', postData)
+      const response = await axios.post<ApiResponse<Post>>(
+        '/api/posts',
+        postData
+      )
       addPost(response.data.data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create post')
@@ -128,12 +139,15 @@ const useAppStore = defineStore('app', () => {
   // Getters
   const userPosts = computed(() => {
     if (!user.value) return []
-    return posts.value.filter(post => post.authorId === user.value!.id)
+    return posts.value.filter((post) => post.authorId === user.value!.id)
   })
 
   const recentPosts = computed(() => {
     return posts.value
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
       .slice(0, 5)
   })
 
@@ -155,7 +169,7 @@ const useAppStore = defineStore('app', () => {
     createPost,
     // Getters
     userPosts,
-    recentPosts
+    recentPosts,
   }
 })
 
@@ -178,16 +192,25 @@ const useApi = <T>(url: string) => {
     }
   }
 
-  return { data: readonly(data), loading: readonly(loading), error: readonly(error), execute }
+  return {
+    data: readonly(data),
+    loading: readonly(loading),
+    error: readonly(error),
+    execute,
+  }
 }
 
 const useLocalStorage = <T>(key: string, defaultValue: T) => {
   const storedValue = localStorage.getItem(key)
   const value = ref<T>(storedValue ? JSON.parse(storedValue) : defaultValue)
 
-  watch(value, (newValue) => {
-    localStorage.setItem(key, JSON.stringify(newValue))
-  }, { deep: true })
+  watch(
+    value,
+    (newValue) => {
+      localStorage.setItem(key, JSON.stringify(newValue))
+    },
+    { deep: true }
+  )
 
   return value
 }
@@ -197,8 +220,8 @@ const UserProfile = defineComponent({
   props: {
     user: {
       type: Object as PropType<User>,
-      required: true
-    }
+      required: true,
+    },
   },
   setup(props) {
     const { copy, isSupported } = useClipboard()
@@ -217,7 +240,7 @@ const UserProfile = defineComponent({
 
     return {
       copyEmail,
-      userSince
+      userSince,
     }
   },
   template: `
@@ -241,15 +264,15 @@ const UserProfile = defineComponent({
         </button>
       </div>
     </div>
-  `
+  `,
 })
 
 const PostCard = defineComponent({
   props: {
     post: {
       type: Object as PropType<Post>,
-      required: true
-    }
+      required: true,
+    },
   },
   setup(props) {
     const store = useAppStore()
@@ -273,7 +296,7 @@ const PostCard = defineComponent({
 
     return {
       deletePost,
-      formatDate
+      formatDate,
     }
   },
   template: `
@@ -304,7 +327,7 @@ const PostCard = defineComponent({
         </p>
       </div>
     </div>
-  `
+  `,
 })
 
 const CreatePostForm = defineComponent({
@@ -315,7 +338,7 @@ const CreatePostForm = defineComponent({
     const form = reactive<CreatePostRequest>({
       title: '',
       content: '',
-      tags: []
+      tags: [],
     })
 
     const tagInput = ref('')
@@ -328,7 +351,7 @@ const CreatePostForm = defineComponent({
     }
 
     const removeTag = (tag: string) => {
-      form.tags = form.tags.filter(t => t !== tag)
+      form.tags = form.tags.filter((t) => t !== tag)
     }
 
     const submitForm = async () => {
@@ -338,12 +361,12 @@ const CreatePostForm = defineComponent({
       }
 
       await store.createPost(form)
-      
+
       // Reset form
       form.title = ''
       form.content = ''
       form.tags = []
-      
+
       toast.success('Post created successfully!')
     }
 
@@ -352,7 +375,7 @@ const CreatePostForm = defineComponent({
       tagInput,
       addTag,
       removeTag,
-      submitForm
+      submitForm,
     }
   },
   template: `
@@ -425,7 +448,7 @@ const CreatePostForm = defineComponent({
         </button>
       </form>
     </div>
-  `
+  `,
 })
 
 // Main App component
@@ -445,13 +468,17 @@ const App = defineComponent({
     })
 
     // Watch for user changes and save to localStorage
-    watch(() => store.user, (newUser) => {
-      if (newUser) {
-        localStorage.setItem('user', JSON.stringify(newUser))
-      } else {
-        localStorage.removeItem('user')
-      }
-    }, { deep: true })
+    watch(
+      () => store.user,
+      (newUser) => {
+        if (newUser) {
+          localStorage.setItem('user', JSON.stringify(newUser))
+        } else {
+          localStorage.removeItem('user')
+        }
+      },
+      { deep: true }
+    )
 
     const login = (user: User) => {
       store.setUser(user)
@@ -468,7 +495,7 @@ const App = defineComponent({
     return {
       store,
       login,
-      logout
+      logout,
     }
   },
   template: `
@@ -496,7 +523,7 @@ const App = defineComponent({
 
       <router-view />
     </div>
-  `
+  `,
 })
 
 // Routes
@@ -542,22 +569,22 @@ const routes: RouteRecordRaw[] = [
             name: 'John Doe',
             email: 'john@example.com',
             role: 'admin',
-            createdAt: new Date('2023-01-15')
+            createdAt: new Date('2023-01-15'),
           },
           {
             id: 2,
             name: 'Jane Smith',
             email: 'jane@example.com',
             role: 'user',
-            createdAt: new Date('2023-02-20')
+            createdAt: new Date('2023-02-20'),
           },
           {
             id: 3,
             name: 'Bob Johnson',
             email: 'bob@example.com',
             role: 'moderator',
-            createdAt: new Date('2023-03-10')
-          }
+            createdAt: new Date('2023-03-10'),
+          },
         ]
 
         const login = (user: User) => {
@@ -567,10 +594,10 @@ const routes: RouteRecordRaw[] = [
 
         return {
           mockUsers,
-          login
+          login,
         }
-      }
-    }
+      },
+    },
   },
   {
     path: '/dashboard',
@@ -612,14 +639,14 @@ const routes: RouteRecordRaw[] = [
       components: {
         PostCard,
         CreatePostForm,
-        UserProfile
+        UserProfile,
       },
       setup() {
         const store = useAppStore()
         return { store }
-      }
-    }
-  }
+      },
+    },
+  },
 ]
 
 // App setup
@@ -627,7 +654,7 @@ const app = createApp(App)
 const pinia = createPinia()
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
 })
 
 app.use(pinia)

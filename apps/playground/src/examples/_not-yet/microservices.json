@@ -3,10 +3,7 @@
   "version": "1.0.0",
   "description": "A microservices architecture example",
   "private": true,
-  "workspaces": [
-    "services/*",
-    "packages/*"
-  ],
+  "workspaces": ["services/*", "packages/*"],
   "scripts": {
     "dev": "concurrently \"npm run dev:auth\" \"npm run dev:api\" \"npm run dev:gateway\"",
     "dev:auth": "cd services/auth && npm run dev",

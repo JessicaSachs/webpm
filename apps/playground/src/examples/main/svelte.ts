@@ -51,19 +51,19 @@ const initialState: AppState = {
   loading: false,
   error: null,
   filter: 'all',
-  searchTerm: ''
+  searchTerm: '',
 }
 
 // Create stores
 const appStore = writable<AppState>(initialState)
 
 // Derived stores
-export const user = derived(appStore, $store => $store.user)
-export const todos = derived(appStore, $store => $store.todos)
-export const loading = derived(appStore, $store => $store.loading)
-export const error = derived(appStore, $store => $store.error)
-export const filter = derived(appStore, $store => $store.filter)
-export const searchTerm = derived(appStore, $store => $store.searchTerm)
+export const user = derived(appStore, ($store) => $store.user)
+export const todos = derived(appStore, ($store) => $store.todos)
+export const loading = derived(appStore, ($store) => $store.loading)
+export const error = derived(appStore, ($store) => $store.error)
+export const filter = derived(appStore, ($store) => $store.filter)
+export const searchTerm = derived(appStore, ($store) => $store.searchTerm)
 
 // Computed derived stores
 export const filteredTodos = derived(
@@ -74,19 +74,20 @@ export const filteredTodos = derived(
     // Apply filter
     switch ($store.filter) {
       case 'active':
-        filtered = filtered.filter(todo => !todo.completed)
+        filtered = filtered.filter((todo) => !todo.completed)
         break
       case 'completed':
-        filtered = filtered.filter(todo => todo.completed)
+        filtered = filtered.filter((todo) => todo.completed)
         break
     }
 
     // Apply search
     if ($searchTerm) {
       const term = $searchTerm.toLowerCase()
-      filtered = filtered.filter(todo => 
-        todo.text.toLowerCase().includes(term) ||
-        todo.tags.some(tag => tag.toLowerCase().includes(term))
+      filtered = filtered.filter(
+        (todo) =>
+          todo.text.toLowerCase().includes(term) ||
+          todo.tags.some((tag) => tag.toLowerCase().includes(term))
       )
     }
 
@@ -94,9 +95,9 @@ export const filteredTodos = derived(
   }
 )
 
-export const todoStats = derived(appStore, $store => {
+export const todoStats = derived(appStore, ($store) => {
   const total = $store.todos.length
-  const completed = $store.todos.filter(todo => todo.completed).length
+  const completed = $store.todos.filter((todo) => todo.completed).length
   const active = total - completed
   const completionRate = total > 0 ? (completed / total) * 100 : 0
 
@@ -104,78 +105,78 @@ export const todoStats = derived(appStore, $store => {
     total,
     completed,
     active,
-    completionRate: Math.round(completionRate)
+    completionRate: Math.round(completionRate),
   }
 })
 
 // Store actions
 export const appActions = {
   setUser: (user: User | null) => {
-    appStore.update(state => ({ ...state, user }))
+    appStore.update((state) => ({ ...state, user }))
   },
 
   setLoading: (loading: boolean) => {
-    appStore.update(state => ({ ...state, loading }))
+    appStore.update((state) => ({ ...state, loading }))
   },
 
   setError: (error: string | null) => {
-    appStore.update(state => ({ ...state, error }))
+    appStore.update((state) => ({ ...state, error }))
   },
 
   setFilter: (filter: 'all' | 'active' | 'completed') => {
-    appStore.update(state => ({ ...state, filter }))
+    appStore.update((state) => ({ ...state, filter }))
   },
 
   setSearchTerm: (searchTerm: string) => {
-    appStore.update(state => ({ ...state, searchTerm }))
+    appStore.update((state) => ({ ...state, searchTerm }))
   },
 
   addTodo: (todo: Todo) => {
-    appStore.update(state => ({
+    appStore.update((state) => ({
       ...state,
-      todos: [todo, ...state.todos]
+      todos: [todo, ...state.todos],
     }))
   },
 
   updateTodo: (id: number, updates: Partial<Todo>) => {
-    appStore.update(state => ({
+    appStore.update((state) => ({
       ...state,
-      todos: state.todos.map(todo =>
+      todos: state.todos.map((todo) =>
         todo.id === id ? { ...todo, ...updates } : todo
-      )
+      ),
     }))
   },
 
   deleteTodo: (id: number) => {
-    appStore.update(state => ({
+    appStore.update((state) => ({
       ...state,
-      todos: state.todos.filter(todo => todo.id !== id)
+      todos: state.todos.filter((todo) => todo.id !== id),
     }))
   },
 
   toggleTodo: (id: number) => {
-    appStore.update(state => ({
+    appStore.update((state) => ({
       ...state,
-      todos: state.todos.map(todo =>
+      todos: state.todos.map((todo) =>
         todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      )
+      ),
     }))
   },
 
   clearCompleted: () => {
-    appStore.update(state => ({
+    appStore.update((state) => ({
       ...state,
-      todos: state.todos.filter(todo => !todo.completed)
+      todos: state.todos.filter((todo) => !todo.completed),
     }))
-  }
+  },
 }
 
 // API functions
 const api = {
   async fetchTodos(): Promise<Todo[]> {
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
     return [
       {
         id: 1,
@@ -183,7 +184,7 @@ const api = {
         completed: false,
         createdAt: new Date('2023-12-01'),
         priority: 'high',
-        tags: ['svelte', 'typescript', 'learning']
+        tags: ['svelte', 'typescript', 'learning'],
       },
       {
         id: 2,
@@ -191,7 +192,7 @@ const api = {
         completed: true,
         createdAt: new Date('2023-11-28'),
         priority: 'medium',
-        tags: ['project', 'app']
+        tags: ['project', 'app'],
       },
       {
         id: 3,
@@ -199,40 +200,40 @@ const api = {
         completed: false,
         createdAt: new Date('2023-11-25'),
         priority: 'low',
-        tags: ['documentation', 'writing']
-      }
+        tags: ['documentation', 'writing'],
+      },
     ]
   },
 
   async createTodo(todoData: CreateTodoRequest): Promise<Todo> {
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
     return {
       id: Date.now(),
       text: todoData.text,
       completed: false,
       createdAt: new Date(),
       priority: todoData.priority,
-      tags: todoData.tags
+      tags: todoData.tags,
     }
   },
 
   async updateTodo(id: number, updates: Partial<Todo>): Promise<Todo> {
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 300))
-    
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
     const currentTodos = await this.fetchTodos()
-    const todo = currentTodos.find(t => t.id === id)
+    const todo = currentTodos.find((t) => t.id === id)
     if (!todo) throw new Error('Todo not found')
-    
+
     return { ...todo, ...updates }
   },
 
   async deleteTodo(id: number): Promise<void> {
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 300))
-  }
+    await new Promise((resolve) => setTimeout(resolve, 300))
+  },
 }
 
 // Utility functions
@@ -240,16 +241,20 @@ const formatDate = (date: Date): string => {
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
   })
 }
 
 const getPriorityColor = (priority: Todo['priority']): string => {
   switch (priority) {
-    case 'high': return 'text-red-600 bg-red-100'
-    case 'medium': return 'text-yellow-600 bg-yellow-100'
-    case 'low': return 'text-green-600 bg-green-100'
-    default: return 'text-gray-600 bg-gray-100'
+    case 'high':
+      return 'text-red-600 bg-red-100'
+    case 'medium':
+      return 'text-yellow-600 bg-yellow-100'
+    case 'low':
+      return 'text-green-600 bg-green-100'
+    default:
+      return 'text-gray-600 bg-gray-100'
   }
 }
 
@@ -257,37 +262,48 @@ const getPriorityColor = (priority: Todo['priority']): string => {
 export const loadTodos = async (): Promise<void> => {
   appActions.setLoading(true)
   appActions.setError(null)
-  
+
   try {
     const todos = await api.fetchTodos()
-    appStore.update(state => ({ ...state, todos }))
+    appStore.update((state) => ({ ...state, todos }))
   } catch (error) {
-    appActions.setError(error instanceof Error ? error.message : 'Failed to load todos')
+    appActions.setError(
+      error instanceof Error ? error.message : 'Failed to load todos'
+    )
   } finally {
     appActions.setLoading(false)
   }
 }
 
-export const createTodo = async (todoData: CreateTodoRequest): Promise<void> => {
+export const createTodo = async (
+  todoData: CreateTodoRequest
+): Promise<void> => {
   appActions.setLoading(true)
   appActions.setError(null)
-  
+
   try {
     const todo = await api.createTodo(todoData)
     appActions.addTodo(todo)
   } catch (error) {
-    appActions.setError(error instanceof Error ? error.message : 'Failed to create todo')
+    appActions.setError(
+      error instanceof Error ? error.message : 'Failed to create todo'
+    )
   } finally {
     appActions.setLoading(false)
   }
 }
 
-export const updateTodo = async (id: number, updates: Partial<Todo>): Promise<void> => {
+export const updateTodo = async (
+  id: number,
+  updates: Partial<Todo>
+): Promise<void> => {
   try {
     const updatedTodo = await api.updateTodo(id, updates)
     appActions.updateTodo(id, updatedTodo)
   } catch (error) {
-    appActions.setError(error instanceof Error ? error.message : 'Failed to update todo')
+    appActions.setError(
+      error instanceof Error ? error.message : 'Failed to update todo'
+    )
   }
 }
 
@@ -296,7 +312,9 @@ export const deleteTodo = async (id: number): Promise<void> => {
     await api.deleteTodo(id)
     appActions.deleteTodo(id)
   } catch (error) {
-    appActions.setError(error instanceof Error ? error.message : 'Failed to delete todo')
+    appActions.setError(
+      error instanceof Error ? error.message : 'Failed to delete todo'
+    )
   }
 }
 
@@ -307,7 +325,7 @@ export const scheduleAutoSave = (): void => {
   if (autoSaveTimeout) {
     clearTimeout(autoSaveTimeout)
   }
-  
+
   autoSaveTimeout = setTimeout(() => {
     // Auto-save logic here
     console.log('Auto-saving todos...')
@@ -337,7 +355,7 @@ export const handleKeydown = (event: KeyboardEvent): void => {
 // Local storage persistence
 export const saveToStorage = (): void => {
   if (typeof window !== 'undefined') {
-    appStore.subscribe(state => {
+    appStore.subscribe((state) => {
       localStorage.setItem('svelte-todos', JSON.stringify(state.todos))
     })
   }
@@ -349,7 +367,7 @@ export const loadFromStorage = (): void => {
     if (stored) {
       try {
         const todos = JSON.parse(stored)
-        appStore.update(state => ({ ...state, todos }))
+        appStore.update((state) => ({ ...state, todos }))
       } catch (error) {
         console.error('Failed to load todos from storage:', error)
       }

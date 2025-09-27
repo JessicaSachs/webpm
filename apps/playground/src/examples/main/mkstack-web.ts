@@ -29,7 +29,7 @@ const registry = new ComponentRegistry()
 registry.register('Button', {
   name: 'Button',
   props: { variant: 'primary' },
-  template: '<button :class="variant">{{ text }}</button>'
+  template: '<button :class="variant">{{ text }}</button>',
 })
 
 const button = registry.get('Button')

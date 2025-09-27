@@ -68,7 +68,7 @@ describe('UserService', () => {
   it('should return user data', async () => {
     const userService = new UserService()
     const user = await userService.getUser('1')
-    
+
     expect(user).toEqual({ id: '1', name: 'John Doe' })
   })
 })

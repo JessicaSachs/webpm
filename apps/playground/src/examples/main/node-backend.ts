@@ -50,13 +50,13 @@ interface RegisterRequest {
 // Zod schemas for validation
 const LoginSchema = z.object({
   email: z.string().email('Invalid email format'),
-  password: z.string().min(6, 'Password must be at least 6 characters')
+  password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 
 const RegisterSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  name: z.string().min(2, 'Name must be at least 2 characters')
+  name: z.string().min(2, 'Name must be at least 2 characters'),
 })
 
 // Database client
@@ -77,19 +77,23 @@ app.use(express.urlencoded({ extended: true }))
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  message: 'Too many requests from this IP, please try again later.',
 })
 app.use('/api/', limiter)
 
 // Auth middleware
-const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+const authenticateToken = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   const authHeader = req.headers['authorization']
   const token = authHeader && authHeader.split(' ')[1]
 
   if (!token) {
     return res.status(401).json({
       success: false,
-      error: 'Access token required'
+      error: 'Access token required',
     })
   }
 
@@ -97,7 +101,7 @@ const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) 
     if (err) {
       return res.status(403).json({
         success: false,
-        error: 'Invalid or expired token'
+        error: 'Invalid or expired token',
       })
     }
     req.user = user as User
@@ -110,7 +114,7 @@ const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({
       success: false,
-      error: 'Admin access required'
+      error: 'Admin access required',
     })
   }
   next()
@@ -121,7 +125,10 @@ const hashPassword = async (password: string): Promise<string> => {
   return bcrypt.hash(password, 12)
 }
 
-const comparePassword = async (password: string, hash: string): Promise<boolean> => {
+const comparePassword = async (
+  password: string,
+  hash: string
+): Promise<boolean> => {
   return bcrypt.compare(password, hash)
 }
 
@@ -141,198 +148,230 @@ app.get('/health', (req: Request, res: Response) => {
     success: true,
     message: 'Server is running',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   })
 })
 
 // Auth routes
-app.post('/api/auth/register', async (req: Request<{}, ApiResponse<{ user: Omit<User, 'password'>, token: string }>, RegisterRequest>, res: Response) => {
-  try {
-    // Validate input
-    const validatedData = RegisterSchema.parse(req.body)
-    
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: validatedData.email }
-    })
-    
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        error: 'User with this email already exists'
-      })
-    }
-    
-    // Hash password
-    const hashedPassword = await hashPassword(validatedData.password)
-    
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email: validatedData.email,
-        password: hashedPassword,
-        name: validatedData.name,
-        role: 'user'
-      }
-    })
-    
-    // Generate token
-    const token = generateToken(user)
-    
-    // Return user without password
-    const { password, ...userWithoutPassword } = user
-    
-    res.status(201).json({
-      success: true,
-      data: {
-        user: userWithoutPassword,
-        token
-      },
-      message: 'User created successfully'
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        error: error.errors.map(e => e.message).join(', ')
-      })
-    }
-    
-    console.error('Registration error:', error)
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
-  }
-})
+app.post(
+  '/api/auth/register',
+  async (
+    req: Request<
+      {},
+      ApiResponse<{ user: Omit<User, 'password'>; token: string }>,
+      RegisterRequest
+    >,
+    res: Response
+  ) => {
+    try {
+      // Validate input
+      const validatedData = RegisterSchema.parse(req.body)
 
-app.post('/api/auth/login', async (req: Request<{}, ApiResponse<{ user: Omit<User, 'password'>, token: string }>, LoginRequest>, res: Response) => {
-  try {
-    // Validate input
-    const validatedData = LoginSchema.parse(req.body)
-    
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email: validatedData.email }
-    })
-    
-    if (!user) {
-      return res.status(401).json({
+      // Check if user already exists
+      const existingUser = await prisma.user.findUnique({
+        where: { email: validatedData.email },
+      })
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          error: 'User with this email already exists',
+        })
+      }
+
+      // Hash password
+      const hashedPassword = await hashPassword(validatedData.password)
+
+      // Create user
+      const user = await prisma.user.create({
+        data: {
+          email: validatedData.email,
+          password: hashedPassword,
+          name: validatedData.name,
+          role: 'user',
+        },
+      })
+
+      // Generate token
+      const token = generateToken(user)
+
+      // Return user without password
+      const { password, ...userWithoutPassword } = user
+
+      res.status(201).json({
+        success: true,
+        data: {
+          user: userWithoutPassword,
+          token,
+        },
+        message: 'User created successfully',
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: error.errors.map((e) => e.message).join(', '),
+        })
+      }
+
+      console.error('Registration error:', error)
+      res.status(500).json({
         success: false,
-        error: 'Invalid email or password'
+        error: 'Internal server error',
       })
     }
-    
-    // Check password
-    const isValidPassword = await comparePassword(validatedData.password, user.password)
-    
-    if (!isValidPassword) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid email or password'
-      })
-    }
-    
-    // Generate token
-    const token = generateToken(user)
-    
-    // Return user without password
-    const { password, ...userWithoutPassword } = user
-    
-    res.json({
-      success: true,
-      data: {
-        user: userWithoutPassword,
-        token
-      },
-      message: 'Login successful'
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        error: error.errors.map(e => e.message).join(', ')
-      })
-    }
-    
-    console.error('Login error:', error)
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
   }
-})
+)
+
+app.post(
+  '/api/auth/login',
+  async (
+    req: Request<
+      {},
+      ApiResponse<{ user: Omit<User, 'password'>; token: string }>,
+      LoginRequest
+    >,
+    res: Response
+  ) => {
+    try {
+      // Validate input
+      const validatedData = LoginSchema.parse(req.body)
+
+      // Find user
+      const user = await prisma.user.findUnique({
+        where: { email: validatedData.email },
+      })
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid email or password',
+        })
+      }
+
+      // Check password
+      const isValidPassword = await comparePassword(
+        validatedData.password,
+        user.password
+      )
+
+      if (!isValidPassword) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid email or password',
+        })
+      }
+
+      // Generate token
+      const token = generateToken(user)
+
+      // Return user without password
+      const { password, ...userWithoutPassword } = user
+
+      res.json({
+        success: true,
+        data: {
+          user: userWithoutPassword,
+          token,
+        },
+        message: 'Login successful',
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: error.errors.map((e) => e.message).join(', '),
+        })
+      }
+
+      console.error('Login error:', error)
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+      })
+    }
+  }
+)
 
 // Protected routes
-app.get('/api/profile', authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true
+app.get(
+  '/api/profile',
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+        })
       }
-    })
-    
-    if (!user) {
-      return res.status(404).json({
+
+      res.json({
+        success: true,
+        data: user,
+        message: 'Profile retrieved successfully',
+      })
+    } catch (error) {
+      console.error('Profile error:', error)
+      res.status(500).json({
         success: false,
-        error: 'User not found'
+        error: 'Internal server error',
       })
     }
-    
-    res.json({
-      success: true,
-      data: user,
-      message: 'Profile retrieved successfully'
-    })
-  } catch (error) {
-    console.error('Profile error:', error)
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
   }
-})
+)
 
-app.get('/api/users', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true
-      },
-      orderBy: { createdAt: 'desc' }
-    })
-    
-    res.json({
-      success: true,
-      data: users,
-      message: 'Users retrieved successfully'
-    })
-  } catch (error) {
-    console.error('Users error:', error)
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+app.get(
+  '/api/users',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const users = await prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      res.json({
+        success: true,
+        data: users,
+        message: 'Users retrieved successfully',
+      })
+    } catch (error) {
+      console.error('Users error:', error)
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+      })
+    }
   }
-})
+)
 
 // Error handling middleware
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandled error:', error)
   res.status(500).json({
     success: false,
-    error: 'Internal server error'
+    error: 'Internal server error',
   })
 })
 
@@ -340,7 +379,7 @@ app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
 app.use('*', (req: Request, res: Response) => {
   res.status(404).json({
     success: false,
-    error: 'Route not found'
+    error: 'Route not found',
   })
 })
 

@@ -7,7 +7,6 @@
     class="w-full"
     @update:modelValue="emitSelection($event)"
   >
-    
   </USelectMenu>
 </template>
 
@@ -30,21 +29,21 @@ interface Props {
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  select: [example: { label: string, value: Example }]
+  select: [example: { label: string; value: Example }]
 }>()
 
 const selectedExample = ref()
 
 // Transform examples into options suitable for USelectMenu
-const exampleOptions = computed(() => 
+const exampleOptions = computed(() =>
   props.examples.map((example) => ({
     label: example.name,
     value: example,
-    description: example.description
+    description: example.description,
   }))
 )
 
-const emitSelection = (example: { label: string, value: Example }) => {
+const emitSelection = (example: { label: string; value: Example }) => {
   selectedExample.value = example.value
   emit('select', example)
 }

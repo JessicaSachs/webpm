@@ -11,10 +11,10 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      component: Playground
-    }
+      component: Playground,
+    },
   ],
-  history: createWebHistory()
+  history: createWebHistory(),
 })
 
 app.use(router)

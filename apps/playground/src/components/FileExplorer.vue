@@ -39,7 +39,7 @@
         class="file-explorer-tree"
       >
         <template #item="{ item }">
-          <div 
+          <div
             class="flex gap-2 w-full text-left cursor-pointer hover:bg-gray-50 rounded px-2 py-1 -mx-2 -my-1"
             :class="{ 'cursor-default': item.children }"
             @click="handleFileClick(item)"
@@ -79,7 +79,11 @@ interface FileTreeItem {
 
 interface Props {
   packages?: FetchedPackage[]
-  onFileClick?: (filePath: string, packageName: string, packageVersion: string) => void
+  onFileClick?: (
+    filePath: string,
+    packageName: string,
+    packageVersion: string
+  ) => void
 }
 
 const props = defineProps<Props>()
@@ -90,12 +94,18 @@ const expandedItems = ref<string[]>([])
 // Handle file click
 const handleFileClick = (item: FileTreeItem) => {
   // Only handle clicks on files, not folders
-  if (item.children || !item.isFile || !item.path || !item.packageName || !item.packageVersion) {
+  if (
+    item.children ||
+    !item.isFile ||
+    !item.path ||
+    !item.packageName ||
+    !item.packageVersion
+  ) {
     return
   }
-  
+
   console.log('File clicked:', item.path, item.packageName, item.packageVersion)
-  
+
   if (props.onFileClick) {
     props.onFileClick(item.path, item.packageName, item.packageVersion)
   }

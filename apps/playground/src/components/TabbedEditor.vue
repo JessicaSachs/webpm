@@ -5,7 +5,10 @@
         <div
           v-for="file in files"
           :key="file.id"
-          :class="['tab', { active: file.id === activeFile, dirty: file.isDirty }]"
+          :class="[
+            'tab',
+            { active: file.id === activeFile, dirty: file.isDirty },
+          ]"
           @click="$emit('file-select', file.id)"
         >
           <span class="file-icon">{{ getFileIcon(file.name) }}</span>
@@ -20,11 +23,15 @@
           </button>
         </div>
       </div>
-      <button class="add-file-button" @click="$emit('file-add')" title="Add new file">
+      <button
+        class="add-file-button"
+        @click="$emit('file-add')"
+        title="Add new file"
+      >
         +
       </button>
     </div>
-    
+
     <div class="editor-container">
       <div class="editor-wrapper">
         <textarea
@@ -49,110 +56,110 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue'
 
 interface File {
-  id: string;
-  name: string;
-  content: string;
-  language: string;
-  isDirty: boolean;
+  id: string
+  name: string
+  content: string
+  language: string
+  isDirty: boolean
 }
 
 interface Props {
-  files: File[];
-  activeFile: string;
+  files: File[]
+  activeFile: string
 }
 
-const props = defineProps<Props>();
+const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  'file-change': [fileId: string, content: string];
-  'file-select': [fileId: string];
-  'file-close': [fileId: string];
-  'file-add': [];
-}>();
+  'file-change': [fileId: string, content: string]
+  'file-select': [fileId: string]
+  'file-close': [fileId: string]
+  'file-add': []
+}>()
 
 const currentFile = computed(() => {
-  return props.files.find(f => f.id === props.activeFile);
-});
+  return props.files.find((f) => f.id === props.activeFile)
+})
 
 const getFileIcon = (fileName: string): string => {
-  const extension = fileName.split('.').pop()?.toLowerCase();
+  const extension = fileName.split('.').pop()?.toLowerCase()
   switch (extension) {
     case 'ts':
     case 'tsx':
-      return '🔷';
+      return '🔷'
     case 'js':
     case 'jsx':
-      return '🟨';
+      return '🟨'
     case 'json':
-      return '📋';
+      return '📋'
     case 'vue':
-      return '💚';
+      return '💚'
     case 'css':
-      return '🎨';
+      return '🎨'
     case 'html':
-      return '🌐';
+      return '🌐'
     case 'md':
-      return '📝';
+      return '📝'
     default:
-      return '📄';
+      return '📄'
   }
-};
+}
 
-const inputValue = ref('');
+const inputValue = ref('')
 
 watch(inputValue, (newValue) => {
   if (currentFile.value) {
-    if (handleInput.debounceTimer) clearTimeout(handleInput.debounceTimer);
+    if (handleInput.debounceTimer) clearTimeout(handleInput.debounceTimer)
     handleInput.debounceTimer = setTimeout(() => {
-      emit('file-change', currentFile.value?.id || '', newValue);
-    }, 500);
+      emit('file-change', currentFile.value?.id || '', newValue)
+    }, 500)
   }
-});
+})
 
 const handleInput = (event: Event) => {
-  const target = event.target as HTMLTextAreaElement;
-  inputValue.value = target.value;
-};
-handleInput.debounceTimer = null as null | ReturnType<typeof setTimeout>;
+  const target = event.target as HTMLTextAreaElement
+  inputValue.value = target.value
+}
+handleInput.debounceTimer = null as null | ReturnType<typeof setTimeout>
 
 const handleKeydown = (event: KeyboardEvent) => {
   // Handle common editor shortcuts
   if (event.ctrlKey || event.metaKey) {
     switch (event.key) {
       case 's':
-        event.preventDefault();
+        event.preventDefault()
         // Save functionality could be added here
-        break;
+        break
       case 'z':
-        event.preventDefault();
+        event.preventDefault()
         // Undo functionality could be added here
-        break;
+        break
       case 'y':
-        event.preventDefault();
+        event.preventDefault()
         // Redo functionality could be added here
-        break;
+        break
     }
   }
-  
+
   // Handle tab insertion
   if (event.key === 'Tab') {
-    event.preventDefault();
-    const target = event.target as HTMLTextAreaElement;
-    const start = target.selectionStart;
-    const end = target.selectionEnd;
-    const value = target.value;
-    
-    target.value = value.substring(0, start) + '  ' + value.substring(end);
-    target.selectionStart = target.selectionEnd = start + 2;
-    
+    event.preventDefault()
+    const target = event.target as HTMLTextAreaElement
+    const start = target.selectionStart
+    const end = target.selectionEnd
+    const value = target.value
+
+    target.value = value.substring(0, start) + '  ' + value.substring(end)
+    target.selectionStart = target.selectionEnd = start + 2
+
     if (currentFile.value) {
-      emit('file-change', currentFile.value.id, target.value);
+      emit('file-change', currentFile.value.id, target.value)
     }
   }
-};
+}
 </script>
 
 <style scoped>
@@ -276,7 +283,9 @@ const handleKeydown = (event: KeyboardEvent) => {
   border: none;
   outline: none;
   padding: 1rem;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-family:
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+    monospace;
   font-size: 14px;
   line-height: 1.5;
   resize: none;

@@ -42,11 +42,11 @@ let config: AppConfig = {
   windowState: {
     width: 1200,
     height: 800,
-    maximized: false
+    maximized: false,
   },
   recentFiles: [],
   autoSave: true,
-  fontSize: 14
+  fontSize: 14,
 }
 
 // Utility functions
@@ -87,8 +87,8 @@ const createWindow = (): void => {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      preload: join(__dirname, 'preload.js')
-    }
+      preload: join(__dirname, 'preload.js'),
+    },
   })
 
   // Load the app
@@ -102,7 +102,7 @@ const createWindow = (): void => {
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()
-    
+
     if (config.windowState.maximized) {
       mainWindow?.maximize()
     }
@@ -150,7 +150,7 @@ const createMenu = (): void => {
           accelerator: 'CmdOrCtrl+N',
           click: () => {
             mainWindow?.webContents.send('menu-new-file')
-          }
+          },
         },
         {
           label: 'Open',
@@ -159,22 +159,28 @@ const createMenu = (): void => {
             const result = await dialog.showOpenDialog(mainWindow!, {
               properties: ['openFile'],
               filters: [
-                { name: 'Text Files', extensions: ['txt', 'md', 'js', 'ts', 'json'] },
-                { name: 'All Files', extensions: ['*'] }
-              ]
+                {
+                  name: 'Text Files',
+                  extensions: ['txt', 'md', 'js', 'ts', 'json'],
+                },
+                { name: 'All Files', extensions: ['*'] },
+              ],
             })
-            
+
             if (!result.canceled && result.filePaths.length > 0) {
-              mainWindow?.webContents.send('menu-open-file', result.filePaths[0])
+              mainWindow?.webContents.send(
+                'menu-open-file',
+                result.filePaths[0]
+              )
             }
-          }
+          },
         },
         {
           label: 'Save',
           accelerator: 'CmdOrCtrl+S',
           click: () => {
             mainWindow?.webContents.send('menu-save-file')
-          }
+          },
         },
         { type: 'separator' },
         {
@@ -182,9 +188,9 @@ const createMenu = (): void => {
           accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
           click: () => {
             app.quit()
-          }
-        }
-      ]
+          },
+        },
+      ],
     },
     {
       label: 'Edit',
@@ -195,8 +201,8 @@ const createMenu = (): void => {
         { role: 'cut' },
         { role: 'copy' },
         { role: 'paste' },
-        { role: 'selectall' }
-      ]
+        { role: 'selectall' },
+      ],
     },
     {
       label: 'View',
@@ -209,16 +215,13 @@ const createMenu = (): void => {
         { role: 'zoomIn' },
         { role: 'zoomOut' },
         { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
+        { role: 'togglefullscreen' },
+      ],
     },
     {
       label: 'Window',
-      submenu: [
-        { role: 'minimize' },
-        { role: 'close' }
-      ]
-    }
+      submenu: [{ role: 'minimize' }, { role: 'close' }],
+    },
   ]
 
   const menu = Menu.buildFromTemplate(template)
@@ -233,47 +236,62 @@ const setupIpcHandlers = (): void => {
   })
 
   // Update app config
-  ipcMain.handle('update-config', async (event, newConfig: Partial<AppConfig>): Promise<void> => {
-    config = { ...config, ...newConfig }
-    await saveConfig()
-  })
+  ipcMain.handle(
+    'update-config',
+    async (event, newConfig: Partial<AppConfig>): Promise<void> => {
+      config = { ...config, ...newConfig }
+      await saveConfig()
+    }
+  )
 
   // Read file
-  ipcMain.handle('read-file', async (event, filePath: string): Promise<FileInfo> => {
-    try {
-      const content = await readFile(filePath, 'utf-8')
-      const stats = await import('fs').then(fs => fs.promises.stat(filePath))
-      
-      return {
-        path: filePath,
-        name: filePath.split('/').pop() || '',
-        size: stats.size,
-        modified: stats.mtime,
-        content
+  ipcMain.handle(
+    'read-file',
+    async (event, filePath: string): Promise<FileInfo> => {
+      try {
+        const content = await readFile(filePath, 'utf-8')
+        const stats = await import('fs').then((fs) =>
+          fs.promises.stat(filePath)
+        )
+
+        return {
+          path: filePath,
+          name: filePath.split('/').pop() || '',
+          size: stats.size,
+          modified: stats.mtime,
+          content,
+        }
+      } catch (error) {
+        throw new Error(
+          `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
       }
-    } catch (error) {
-      throw new Error(`Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-  })
+  )
 
   // Write file
-  ipcMain.handle('write-file', async (event, filePath: string, content: string): Promise<void> => {
-    try {
-      await writeFile(filePath, content, 'utf-8')
-      
-      // Add to recent files
-      const recentIndex = config.recentFiles.indexOf(filePath)
-      if (recentIndex > -1) {
-        config.recentFiles.splice(recentIndex, 1)
+  ipcMain.handle(
+    'write-file',
+    async (event, filePath: string, content: string): Promise<void> => {
+      try {
+        await writeFile(filePath, content, 'utf-8')
+
+        // Add to recent files
+        const recentIndex = config.recentFiles.indexOf(filePath)
+        if (recentIndex > -1) {
+          config.recentFiles.splice(recentIndex, 1)
+        }
+        config.recentFiles.unshift(filePath)
+        config.recentFiles = config.recentFiles.slice(0, 10) // Keep only 10 recent files
+
+        await saveConfig()
+      } catch (error) {
+        throw new Error(
+          `Failed to write file: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
       }
-      config.recentFiles.unshift(filePath)
-      config.recentFiles = config.recentFiles.slice(0, 10) // Keep only 10 recent files
-      
-      await saveConfig()
-    } catch (error) {
-      throw new Error(`Failed to write file: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-  })
+  )
 
   // Get recent files
   ipcMain.handle('get-recent-files', async (): Promise<string[]> => {
@@ -281,51 +299,57 @@ const setupIpcHandlers = (): void => {
   })
 
   // Search in files
-  ipcMain.handle('search-files', async (event, searchTerm: string, directory: string): Promise<SearchResult[]> => {
-    const results: SearchResult[] = []
-    
-    try {
-      const watcher = watch(directory, {
-        ignored: /(^|[\/\\])\../, // ignore dotfiles
-        persistent: false
-      })
+  ipcMain.handle(
+    'search-files',
+    async (
+      event,
+      searchTerm: string,
+      directory: string
+    ): Promise<SearchResult[]> => {
+      const results: SearchResult[] = []
 
-      const searchInFile = async (filePath: string): Promise<void> => {
-        try {
-          const content = await readFile(filePath, 'utf-8')
-          const lines = content.split('\n')
-          
-          lines.forEach((line, index) => {
-            const regex = new RegExp(searchTerm, 'gi')
-            let match
-            while ((match = regex.exec(line)) !== null) {
-              results.push({
-                file: filePath,
-                line: index + 1,
-                column: match.index + 1,
-                text: line.trim(),
-                match: match[0]
-              })
-            }
-          })
-        } catch (error) {
-          // Skip files that can't be read
+      try {
+        const watcher = watch(directory, {
+          ignored: /(^|[\/\\])\../, // ignore dotfiles
+          persistent: false,
+        })
+
+        const searchInFile = async (filePath: string): Promise<void> => {
+          try {
+            const content = await readFile(filePath, 'utf-8')
+            const lines = content.split('\n')
+
+            lines.forEach((line, index) => {
+              const regex = new RegExp(searchTerm, 'gi')
+              let match
+              while ((match = regex.exec(line)) !== null) {
+                results.push({
+                  file: filePath,
+                  line: index + 1,
+                  column: match.index + 1,
+                  text: line.trim(),
+                  match: match[0],
+                })
+              }
+            })
+          } catch (error) {
+            // Skip files that can't be read
+          }
         }
+
+        watcher.on('add', searchInFile)
+        watcher.on('change', searchInFile)
+
+        // Wait for initial scan
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        watcher.close()
+      } catch (error) {
+        console.error('Search error:', error)
       }
 
-      watcher.on('add', searchInFile)
-      watcher.on('change', searchInFile)
-      
-      // Wait for initial scan
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      watcher.close()
-      
-    } catch (error) {
-      console.error('Search error:', error)
+      return results
     }
-
-    return results
-  })
+  )
 
   // Open external link
   ipcMain.handle('open-external', async (event, url: string): Promise<void> => {
@@ -333,16 +357,28 @@ const setupIpcHandlers = (): void => {
   })
 
   // Show save dialog
-  ipcMain.handle('show-save-dialog', async (event, options: Electron.SaveDialogOptions): Promise<string | null> => {
-    const result = await dialog.showSaveDialog(mainWindow!, options)
-    return result.canceled ? null : result.filePath || null
-  })
+  ipcMain.handle(
+    'show-save-dialog',
+    async (
+      event,
+      options: Electron.SaveDialogOptions
+    ): Promise<string | null> => {
+      const result = await dialog.showSaveDialog(mainWindow!, options)
+      return result.canceled ? null : result.filePath || null
+    }
+  )
 
   // Show open dialog
-  ipcMain.handle('show-open-dialog', async (event, options: Electron.OpenDialogOptions): Promise<string[] | null> => {
-    const result = await dialog.showOpenDialog(mainWindow!, options)
-    return result.canceled ? null : result.filePaths
-  })
+  ipcMain.handle(
+    'show-open-dialog',
+    async (
+      event,
+      options: Electron.OpenDialogOptions
+    ): Promise<string[] | null> => {
+      const result = await dialog.showOpenDialog(mainWindow!, options)
+      return result.canceled ? null : result.filePaths
+    }
+  )
 }
 
 // App event handlers
@@ -372,7 +408,9 @@ app.on('before-quit', async () => {
 // Handle protocol for deep linking
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('electron-app', process.execPath, [process.argv[1]])
+    app.setAsDefaultProtocolClient('electron-app', process.execPath, [
+      process.argv[1],
+    ])
   }
 } else {
   app.setAsDefaultProtocolClient('electron-app')

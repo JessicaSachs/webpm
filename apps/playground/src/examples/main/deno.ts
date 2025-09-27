@@ -41,13 +41,13 @@ interface CreatePostRequest {
 const CreatePostSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   content: z.string().min(1, 'Content is required'),
-  tags: z.array(z.string()).default([])
+  tags: z.array(z.string()).default([]),
 })
 
 const UpdatePostSchema = z.object({
   title: z.string().min(1, 'Title is required').optional(),
   content: z.string().min(1, 'Content is required').optional(),
-  tags: z.array(z.string()).optional()
+  tags: z.array(z.string()).optional(),
 })
 
 // In-memory storage (in production, use a database)
@@ -57,15 +57,15 @@ const users: User[] = [
     name: 'John Doe',
     email: 'john@example.com',
     role: 'admin',
-    createdAt: new Date('2023-01-15')
+    createdAt: new Date('2023-01-15'),
   },
   {
     id: 2,
     name: 'Jane Smith',
     email: 'jane@example.com',
     role: 'user',
-    createdAt: new Date('2023-02-20')
-  }
+    createdAt: new Date('2023-02-20'),
+  },
 ]
 
 const posts: Post[] = [
@@ -75,7 +75,7 @@ const posts: Post[] = [
     content: 'Deno is a modern runtime for JavaScript and TypeScript...',
     authorId: 1,
     createdAt: new Date('2023-12-01'),
-    tags: ['deno', 'javascript', 'typescript']
+    tags: ['deno', 'javascript', 'typescript'],
   },
   {
     id: 2,
@@ -83,8 +83,8 @@ const posts: Post[] = [
     content: 'Here are some best practices for writing TypeScript code...',
     authorId: 2,
     createdAt: new Date('2023-11-28'),
-    tags: ['typescript', 'development']
-  }
+    tags: ['typescript', 'development'],
+  },
 ]
 
 // Utility functions
@@ -95,16 +95,19 @@ const createResponse = <T>(data: T, status: number = 200): Response => {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-    }
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
   })
 }
 
 const createErrorResponse = (error: string, status: number = 400): Response => {
-  return createResponse<ApiResponse<null>>({
-    success: false,
-    error
-  }, status)
+  return createResponse<ApiResponse<null>>(
+    {
+      success: false,
+      error,
+    },
+    status
+  )
 }
 
 const parseJson = async <T>(request: Request): Promise<T> => {
@@ -113,43 +116,43 @@ const parseJson = async <T>(request: Request): Promise<T> => {
 }
 
 const findUserById = (id: number): User | undefined => {
-  return users.find(user => user.id === id)
+  return users.find((user) => user.id === id)
 }
 
 const findPostById = (id: number): Post | undefined => {
-  return posts.find(post => post.id === id)
+  return posts.find((post) => post.id === id)
 }
 
 // Route handlers
 const handleGetPosts = (): Response => {
-  const postsWithAuthors = posts.map(post => ({
+  const postsWithAuthors = posts.map((post) => ({
     ...post,
-    author: findUserById(post.authorId)
+    author: findUserById(post.authorId),
   }))
-  
+
   return createResponse<ApiResponse<Post[]>>({
     success: true,
     data: postsWithAuthors,
-    message: 'Posts retrieved successfully'
+    message: 'Posts retrieved successfully',
   })
 }
 
 const handleGetPost = (id: number): Response => {
   const post = findPostById(id)
-  
+
   if (!post) {
     return createErrorResponse('Post not found', 404)
   }
-  
+
   const postWithAuthor = {
     ...post,
-    author: findUserById(post.authorId)
+    author: findUserById(post.authorId),
   }
-  
+
   return createResponse<ApiResponse<Post>>({
     success: true,
     data: postWithAuthor,
-    message: 'Post retrieved successfully'
+    message: 'Post retrieved successfully',
   })
 }
 
@@ -157,72 +160,78 @@ const handleCreatePost = async (request: Request): Promise<Response> => {
   try {
     const body = await parseJson<CreatePostRequest>(request)
     const validatedData = CreatePostSchema.parse(body)
-    
+
     const newPost: Post = {
-      id: Math.max(...posts.map(p => p.id), 0) + 1,
+      id: Math.max(...posts.map((p) => p.id), 0) + 1,
       title: validatedData.title,
       content: validatedData.content,
       authorId: 1, // In real app, get from auth
       createdAt: new Date(),
-      tags: validatedData.tags
+      tags: validatedData.tags,
     }
-    
+
     posts.unshift(newPost)
-    
+
     const postWithAuthor = {
       ...newPost,
-      author: findUserById(newPost.authorId)
+      author: findUserById(newPost.authorId),
     }
-    
-    return createResponse<ApiResponse<Post>>({
-      success: true,
-      data: postWithAuthor,
-      message: 'Post created successfully'
-    }, 201)
+
+    return createResponse<ApiResponse<Post>>(
+      {
+        success: true,
+        data: postWithAuthor,
+        message: 'Post created successfully',
+      },
+      201
+    )
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse(error.errors.map(e => e.message).join(', '))
+      return createErrorResponse(error.errors.map((e) => e.message).join(', '))
     }
-    
+
     console.error('Create post error:', error)
     return createErrorResponse('Internal server error', 500)
   }
 }
 
-const handleUpdatePost = async (id: number, request: Request): Promise<Response> => {
+const handleUpdatePost = async (
+  id: number,
+  request: Request
+): Promise<Response> => {
   try {
     const post = findPostById(id)
-    
+
     if (!post) {
       return createErrorResponse('Post not found', 404)
     }
-    
+
     const body = await parseJson<Partial<CreatePostRequest>>(request)
     const validatedData = UpdatePostSchema.parse(body)
-    
+
     const updatedPost = {
       ...post,
-      ...validatedData
+      ...validatedData,
     }
-    
-    const index = posts.findIndex(p => p.id === id)
+
+    const index = posts.findIndex((p) => p.id === id)
     posts[index] = updatedPost
-    
+
     const postWithAuthor = {
       ...updatedPost,
-      author: findUserById(updatedPost.authorId)
+      author: findUserById(updatedPost.authorId),
     }
-    
+
     return createResponse<ApiResponse<Post>>({
       success: true,
       data: postWithAuthor,
-      message: 'Post updated successfully'
+      message: 'Post updated successfully',
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse(error.errors.map(e => e.message).join(', '))
+      return createErrorResponse(error.errors.map((e) => e.message).join(', '))
     }
-    
+
     console.error('Update post error:', error)
     return createErrorResponse('Internal server error', 500)
   }
@@ -230,17 +239,17 @@ const handleUpdatePost = async (id: number, request: Request): Promise<Response>
 
 const handleDeletePost = (id: number): Response => {
   const post = findPostById(id)
-  
+
   if (!post) {
     return createErrorResponse('Post not found', 404)
   }
-  
-  const index = posts.findIndex(p => p.id === id)
+
+  const index = posts.findIndex((p) => p.id === id)
   posts.splice(index, 1)
-  
+
   return createResponse<ApiResponse<null>>({
     success: true,
-    message: 'Post deleted successfully'
+    message: 'Post deleted successfully',
   })
 }
 
@@ -248,32 +257,32 @@ const handleGetUsers = (): Response => {
   return createResponse<ApiResponse<User[]>>({
     success: true,
     data: users,
-    message: 'Users retrieved successfully'
+    message: 'Users retrieved successfully',
   })
 }
 
 const handleGetUser = (id: number): Response => {
   const user = findUserById(id)
-  
+
   if (!user) {
     return createErrorResponse('User not found', 404)
   }
-  
+
   return createResponse<ApiResponse<User>>({
     success: true,
     data: user,
-    message: 'User retrieved successfully'
+    message: 'User retrieved successfully',
   })
 }
 
 // Static file handler
 const handleStaticFile = async (pathname: string): Promise<Response> => {
   const filePath = join(Deno.cwd(), 'public', pathname)
-  
+
   if (await exists(filePath)) {
     return await serveFile(new Request(`file://${filePath}`), filePath)
   }
-  
+
   return createErrorResponse('File not found', 404)
 }
 
@@ -282,7 +291,7 @@ const handleRequest = async (request: Request): Promise<Response> => {
   const url = new URL(request.url)
   const pathname = url.pathname
   const method = request.method
-  
+
   // CORS preflight
   if (method === 'OPTIONS') {
     return new Response(null, {
@@ -290,33 +299,35 @@ const handleRequest = async (request: Request): Promise<Response> => {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-      }
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
     })
   }
-  
+
   // Health check
   if (pathname === '/health') {
-    return createResponse<ApiResponse<{ status: string, timestamp: string, uptime: number }>>({
+    return createResponse<
+      ApiResponse<{ status: string; timestamp: string; uptime: number }>
+    >({
       success: true,
       data: {
         status: 'ok',
         timestamp: new Date().toISOString(),
-        uptime: performance.now()
+        uptime: performance.now(),
       },
-      message: 'Server is running'
+      message: 'Server is running',
     })
   }
-  
+
   // API routes
   if (pathname.startsWith('/api/')) {
     const apiPath = pathname.replace('/api', '')
-    
+
     // Posts routes
     if (apiPath === '/posts' && method === 'GET') {
       return handleGetPosts()
     }
-    
+
     if (apiPath.startsWith('/posts/') && method === 'GET') {
       const id = parseInt(apiPath.split('/')[2])
       if (isNaN(id)) {
@@ -324,11 +335,11 @@ const handleRequest = async (request: Request): Promise<Response> => {
       }
       return handleGetPost(id)
     }
-    
+
     if (apiPath === '/posts' && method === 'POST') {
       return await handleCreatePost(request)
     }
-    
+
     if (apiPath.startsWith('/posts/') && method === 'PUT') {
       const id = parseInt(apiPath.split('/')[2])
       if (isNaN(id)) {
@@ -336,7 +347,7 @@ const handleRequest = async (request: Request): Promise<Response> => {
       }
       return await handleUpdatePost(id, request)
     }
-    
+
     if (apiPath.startsWith('/posts/') && method === 'DELETE') {
       const id = parseInt(apiPath.split('/')[2])
       if (isNaN(id)) {
@@ -344,12 +355,12 @@ const handleRequest = async (request: Request): Promise<Response> => {
       }
       return handleDeletePost(id)
     }
-    
+
     // Users routes
     if (apiPath === '/users' && method === 'GET') {
       return handleGetUsers()
     }
-    
+
     if (apiPath.startsWith('/users/') && method === 'GET') {
       const id = parseInt(apiPath.split('/')[2])
       if (isNaN(id)) {
@@ -357,21 +368,21 @@ const handleRequest = async (request: Request): Promise<Response> => {
       }
       return handleGetUser(id)
     }
-    
+
     // 404 for API routes
     return createErrorResponse('API endpoint not found', 404)
   }
-  
+
   // Static files
   if (pathname.startsWith('/static/')) {
     return await handleStaticFile(pathname.replace('/static/', ''))
   }
-  
+
   // Default route - serve index.html
   if (pathname === '/' || pathname === '/index.html') {
     return await handleStaticFile('index.html')
   }
-  
+
   // 404
   return createErrorResponse('Route not found', 404)
 }

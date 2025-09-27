@@ -19,7 +19,7 @@ const props = withDefaults(defineProps<Props>(), {
   language: 'typescript',
   theme: 'vs-dark',
   readOnly: false,
-  options: () => ({})
+  options: () => ({}),
 })
 
 const emit = defineEmits<{
@@ -77,9 +77,9 @@ const initializeEditor = async () => {
     roundedSelection: false,
     scrollbar: {
       vertical: 'auto',
-      horizontal: 'auto'
+      horizontal: 'auto',
     },
-    ...props.options
+    ...props.options,
   })
 
   // Listen for content changes
@@ -103,29 +103,41 @@ const disposeEditor = () => {
 }
 
 // Watch for prop changes
-watch(() => props.modelValue, (newValue) => {
-  if (editor && editor.getValue() !== newValue) {
-    editor.setValue(newValue)
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    if (editor && editor.getValue() !== newValue) {
+      editor.setValue(newValue)
+    }
   }
-})
+)
 
-watch(() => props.language, (newLanguage) => {
-  if (editor) {
-    monaco.editor.setModelLanguage(editor.getModel()!, newLanguage)
+watch(
+  () => props.language,
+  (newLanguage) => {
+    if (editor) {
+      monaco.editor.setModelLanguage(editor.getModel()!, newLanguage)
+    }
   }
-})
+)
 
-watch(() => props.theme, (newTheme) => {
-  if (editor) {
-    monaco.editor.setTheme(newTheme)
+watch(
+  () => props.theme,
+  (newTheme) => {
+    if (editor) {
+      monaco.editor.setTheme(newTheme)
+    }
   }
-})
+)
 
-watch(() => props.readOnly, (newReadOnly) => {
-  if (editor) {
-    editor.updateOptions({ readOnly: newReadOnly })
+watch(
+  () => props.readOnly,
+  (newReadOnly) => {
+    if (editor) {
+      editor.updateOptions({ readOnly: newReadOnly })
+    }
   }
-})
+)
 
 onMounted(async () => {
   await nextTick()
@@ -142,7 +154,7 @@ defineExpose({
   getValue: () => editor?.getValue(),
   setValue: (value: string) => editor?.setValue(value),
   focus: () => editor?.focus(),
-  dispose: disposeEditor
+  dispose: disposeEditor,
 })
 </script>
 

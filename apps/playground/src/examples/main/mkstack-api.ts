@@ -12,17 +12,17 @@ class ApiController {
     try {
       const users = [
         { id: 1, name: 'John Doe' },
-        { id: 2, name: 'Jane Smith' }
+        { id: 2, name: 'Jane Smith' },
       ]
-      
+
       return {
         success: true,
-        data: users
+        data: users,
       }
     } catch (error) {
       return {
         success: false,
-        error: 'Failed to fetch users'
+        error: 'Failed to fetch users',
       }
     }
   }

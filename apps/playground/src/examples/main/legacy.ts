@@ -20,7 +20,7 @@ interface Item {
 }
 
 function calculateTotal(items: Item[]): number {
-  return items.reduce((total, item) => total + (item.price * item.quantity), 0)
+  return items.reduce((total, item) => total + item.price * item.quantity, 0)
 }
 
 // Legacy callback-style code modernization
@@ -42,8 +42,8 @@ function modernFetchData(): Promise<{ message: string }> {
 
 // Usage examples
 const items: Item[] = [
-  { name: 'Apple', price: 1.50, quantity: 3 },
-  { name: 'Banana', price: 0.75, quantity: 5 }
+  { name: 'Apple', price: 1.5, quantity: 3 },
+  { name: 'Banana', price: 0.75, quantity: 5 },
 ]
 
 const total = calculateTotal(items)

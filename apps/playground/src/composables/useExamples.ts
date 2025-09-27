@@ -10,10 +10,15 @@ interface Example {
 }
 
 // Import all example JSON files
-const exampleModules = import.meta.glob('../examples/*.json', { eager: true }) as Record<string, { default: Record<string, unknown> }>
+const exampleModules = import.meta.glob('../examples/*.json', {
+  eager: true,
+}) as Record<string, { default: Record<string, unknown> }>
 
 // Import all main.ts files
-const mainTsModules = import.meta.glob('../examples/main/*.ts', { eager: true, as: 'raw' }) as Record<string, string>
+const mainTsModules = import.meta.glob('../examples/main/*.ts', {
+  eager: true,
+  as: 'raw',
+}) as Record<string, string>
 
 export const useExamples = () => {
   const examples = ref<Example[]>([])
@@ -27,11 +32,15 @@ export const useExamples = () => {
       const content = module.default
 
       // Extract name from package.json or use filename
-      const name = (typeof content.name === 'string' ? content.name : null) ||
+      const name =
+        (typeof content.name === 'string' ? content.name : null) ||
         filename.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
 
       // Create description based on content
-      const description = (typeof content.description === 'string' ? content.description : null) ||
+      const description =
+        (typeof content.description === 'string'
+          ? content.description
+          : null) ||
         (content.dependencies
           ? `Dependencies: ${Object.keys(content.dependencies).length}`
           : '') ||
@@ -53,7 +62,7 @@ export const useExamples = () => {
         content: JSON.stringify(content, null, 2),
         language: 'json',
         filename: filename || 'unknown',
-        mainTsContent: mainTsContent || undefined
+        mainTsContent: mainTsContent || undefined,
       })
     }
 

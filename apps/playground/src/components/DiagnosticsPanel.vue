@@ -11,23 +11,24 @@
           Analyzing...
         </span>
         <span v-else class="summary-text">
-          {{ diagnostics.length }} {{ diagnostics.length === 1 ? 'issue' : 'issues' }}
+          {{ diagnostics.length }}
+          {{ diagnostics.length === 1 ? 'issue' : 'issues' }}
         </span>
       </div>
     </div>
-    
+
     <div class="diagnostics-content">
       <div v-if="isLoading" class="loading-state">
         <div class="loading-spinner"></div>
         <p>Analyzing TypeScript code...</p>
       </div>
-      
+
       <div v-else-if="diagnostics.length === 0" class="no-issues">
         <div class="success-icon">✅</div>
         <h4>No issues found!</h4>
         <p>Your TypeScript code is clean and error-free.</p>
       </div>
-      
+
       <div v-else class="diagnostics-list">
         <div
           v-for="(diagnostic, index) in diagnostics"
@@ -35,14 +36,21 @@
           :class="['diagnostic-item', getDiagnosticClass(diagnostic.category)]"
         >
           <div class="diagnostic-header">
-            <span class="diagnostic-icon">{{ getDiagnosticIcon(diagnostic.category) }}</span>
+            <span class="diagnostic-icon">{{
+              getDiagnosticIcon(diagnostic.category)
+            }}</span>
             <span class="diagnostic-code">TS{{ diagnostic.code }}</span>
-            <span class="diagnostic-file">{{ getFileName(diagnostic.fileName) }}</span>
+            <span class="diagnostic-file">{{
+              getFileName(diagnostic.fileName)
+            }}</span>
           </div>
           <div class="diagnostic-message">
             {{ diagnostic.messageText }}
           </div>
-          <div v-if="diagnostic.start !== undefined" class="diagnostic-location">
+          <div
+            v-if="diagnostic.start !== undefined"
+            class="diagnostic-location"
+          >
             Position: {{ getPosition(diagnostic.start) }}
           </div>
         </div>
@@ -52,64 +60,64 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import ts from 'typescript';
+import { computed } from 'vue'
+import ts from 'typescript'
 
 interface Diagnostic {
-  fileName: string;
-  messageText: string;
-  category: ts.DiagnosticCategory;
-  code: number;
-  start?: number;
-  length?: number;
+  fileName: string
+  messageText: string
+  category: ts.DiagnosticCategory
+  code: number
+  start?: number
+  length?: number
 }
 
 interface Props {
-  diagnostics: Diagnostic[];
-  isLoading: boolean;
+  diagnostics: Diagnostic[]
+  isLoading: boolean
 }
 
-const props = defineProps<Props>();
+const props = defineProps<Props>()
 
 const getDiagnosticClass = (category: ts.DiagnosticCategory): string => {
   switch (category) {
     case ts.DiagnosticCategory.Error:
-      return 'error';
+      return 'error'
     case ts.DiagnosticCategory.Warning:
-      return 'warning';
+      return 'warning'
     case ts.DiagnosticCategory.Suggestion:
-      return 'suggestion';
+      return 'suggestion'
     case ts.DiagnosticCategory.Message:
-      return 'message';
+      return 'message'
     default:
-      return 'unknown';
+      return 'unknown'
   }
-};
+}
 
 const getDiagnosticIcon = (category: ts.DiagnosticCategory): string => {
   switch (category) {
     case ts.DiagnosticCategory.Error:
-      return '❌';
+      return '❌'
     case ts.DiagnosticCategory.Warning:
-      return '⚠️';
+      return '⚠️'
     case ts.DiagnosticCategory.Suggestion:
-      return '💡';
+      return '💡'
     case ts.DiagnosticCategory.Message:
-      return 'ℹ️';
+      return 'ℹ️'
     default:
-      return '❓';
+      return '❓'
   }
-};
+}
 
 const getFileName = (fileName: string): string => {
-  return fileName.split('/').pop() || fileName;
-};
+  return fileName.split('/').pop() || fileName
+}
 
 const getPosition = (start: number): string => {
   // This is a simplified position calculation
   // In a real implementation, you'd want to calculate line and column
-  return `char ${start}`;
-};
+  return `char ${start}`
+}
 
 // Group diagnostics by category for better organization
 const groupedDiagnostics = computed(() => {
@@ -117,28 +125,28 @@ const groupedDiagnostics = computed(() => {
     errors: [] as Diagnostic[],
     warnings: [] as Diagnostic[],
     suggestions: [] as Diagnostic[],
-    messages: [] as Diagnostic[]
-  };
-  
-  props.diagnostics.forEach(diagnostic => {
+    messages: [] as Diagnostic[],
+  }
+
+  props.diagnostics.forEach((diagnostic) => {
     switch (diagnostic.category) {
       case ts.DiagnosticCategory.Error:
-        groups.errors.push(diagnostic);
-        break;
+        groups.errors.push(diagnostic)
+        break
       case ts.DiagnosticCategory.Warning:
-        groups.warnings.push(diagnostic);
-        break;
+        groups.warnings.push(diagnostic)
+        break
       case ts.DiagnosticCategory.Suggestion:
-        groups.suggestions.push(diagnostic);
-        break;
+        groups.suggestions.push(diagnostic)
+        break
       case ts.DiagnosticCategory.Message:
-        groups.messages.push(diagnostic);
-        break;
+        groups.messages.push(diagnostic)
+        break
     }
-  });
-  
-  return groups;
-});
+  })
+
+  return groups
+})
 </script>
 
 <style scoped>
@@ -193,8 +201,12 @@ const groupedDiagnostics = computed(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .diagnostics-content {
@@ -300,7 +312,9 @@ const groupedDiagnostics = computed(() => {
   border-radius: 3px;
   font-size: 0.75rem;
   font-weight: 500;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-family:
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+    monospace;
 }
 
 .diagnostic-file {
@@ -319,7 +333,9 @@ const groupedDiagnostics = computed(() => {
 .diagnostic-location {
   color: #7d8590;
   font-size: 0.8rem;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-family:
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+    monospace;
 }
 
 /* Scrollbar styling */
@@ -340,4 +356,3 @@ const groupedDiagnostics = computed(() => {
   background: #484f58;
 }
 </style>
-

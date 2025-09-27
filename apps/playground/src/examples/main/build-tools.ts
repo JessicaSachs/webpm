@@ -40,7 +40,7 @@ const createWebpackConfig = (config: BuildConfig): Configuration => {
     output: {
       path: join(process.cwd(), config.output),
       filename: '[name].[contenthash].js',
-      clean: true
+      clean: true,
     },
     devtool: config.sourceMap ? 'source-map' : false,
     module: {
@@ -52,27 +52,29 @@ const createWebpackConfig = (config: BuildConfig): Configuration => {
             options: {
               presets: [
                 ['@babel/preset-env', { targets: 'defaults' }],
-                '@babel/preset-typescript'
-              ]
-            }
+                '@babel/preset-typescript',
+              ],
+            },
           },
-          exclude: /node_modules/
+          exclude: /node_modules/,
         },
         {
           test: /\.css$/,
-          use: ['style-loader', 'css-loader']
-        }
-      ]
+          use: ['style-loader', 'css-loader'],
+        },
+      ],
     },
     plugins: [
       new webpack.DefinePlugin({
-        'process.env.NODE_ENV': JSON.stringify(config.mode)
-      })
+        'process.env.NODE_ENV': JSON.stringify(config.mode),
+      }),
     ],
     optimization: {
       minimize: config.minify,
-      minimizer: config.minify ? [new (require('terser-webpack-plugin'))()] : []
-    }
+      minimizer: config.minify
+        ? [new (require('terser-webpack-plugin'))()]
+        : [],
+    },
   }
 }
 
@@ -88,15 +90,15 @@ const createViteConfig = (config: BuildConfig) => {
         output: {
           entryFileNames: '[name].[hash].js',
           chunkFileNames: '[name].[hash].js',
-          assetFileNames: '[name].[hash].[ext]'
-        }
-      }
+          assetFileNames: '[name].[hash].[ext]',
+        },
+      },
     },
     plugins: [
       require('@vitejs/plugin-legacy')({
-        targets: ['defaults', 'not IE 11']
-      })
-    ]
+        targets: ['defaults', 'not IE 11'],
+      }),
+    ],
   })
 }
 
@@ -107,15 +109,15 @@ const createRollupConfig = (config: BuildConfig) => {
     output: {
       file: join(config.output, 'bundle.js'),
       format: 'es',
-      sourcemap: config.sourceMap
+      sourcemap: config.sourceMap,
     },
     plugins: [
       require('@rollup/plugin-node-resolve')(),
       require('@rollup/plugin-commonjs')(),
       require('@rollup/plugin-typescript')({
-        tsconfig: './tsconfig.json'
-      })
-    ]
+        tsconfig: './tsconfig.json',
+      }),
+    ],
   }
 }
 
@@ -127,7 +129,7 @@ class BuildTools {
   constructor(config: BuildConfig) {
     this.config = config
     this.eslint = new ESLint({
-      extensions: ['.js', '.ts', '.jsx', '.tsx']
+      extensions: ['.js', '.ts', '.jsx', '.tsx'],
     })
   }
 
@@ -153,7 +155,7 @@ class BuildTools {
           size: totalSize,
           gzippedSize: Math.round(totalSize * 0.3), // Approximate gzip ratio
           chunks: Object.keys(info.chunks || {}).length,
-          assets
+          assets,
         })
       })
     })
@@ -163,9 +165,9 @@ class BuildTools {
   async buildWithVite(): Promise<BundleResult> {
     const viteConfig = createViteConfig(this.config)
     const { build } = await import('vite')
-    
+
     const result = await build(viteConfig)
-    
+
     if (Array.isArray(result)) {
       const totalSize = result.reduce((size, chunk) => {
         return size + (chunk.output?.[0]?.code?.length || 0)
@@ -175,7 +177,9 @@ class BuildTools {
         size: totalSize,
         gzippedSize: Math.round(totalSize * 0.3),
         chunks: result.length,
-        assets: result.map(chunk => chunk.output?.[0]?.fileName || '').filter(Boolean)
+        assets: result
+          .map((chunk) => chunk.output?.[0]?.fileName || '')
+          .filter(Boolean),
       }
     }
 
@@ -183,7 +187,7 @@ class BuildTools {
       size: 0,
       gzippedSize: 0,
       chunks: 0,
-      assets: []
+      assets: [],
     }
   }
 
@@ -191,9 +195,9 @@ class BuildTools {
   async buildWithRollup(): Promise<BundleResult> {
     const rollupConfig = createRollupConfig(this.config)
     const bundle = await rollup(rollupConfig)
-    
+
     const { output } = await bundle.generate(rollupConfig.output as any)
-    
+
     const totalSize = output.reduce((size, chunk) => {
       if (chunk.type === 'chunk') {
         return size + chunk.code.length
@@ -205,7 +209,7 @@ class BuildTools {
       size: totalSize,
       gzippedSize: Math.round(totalSize * 0.3),
       chunks: output.length,
-      assets: output.map(chunk => chunk.fileName).filter(Boolean)
+      assets: output.map((chunk) => chunk.fileName).filter(Boolean),
     }
   }
 
@@ -218,13 +222,15 @@ class BuildTools {
 
       try {
         const lintResults = await this.eslint.lintFiles(file)
-        
+
         for (const result of lintResults) {
           results.push({
             file: result.filePath,
             errors: result.errorCount,
             warnings: result.warningCount,
-            messages: result.messages.map(msg => `${msg.line}:${msg.column} ${msg.message}`)
+            messages: result.messages.map(
+              (msg) => `${msg.line}:${msg.column} ${msg.message}`
+            ),
           })
         }
       } catch (error) {
@@ -241,7 +247,7 @@ class BuildTools {
       const options = await prettier.resolveConfig(filePath)
       return await prettier.format(code, {
         ...options,
-        filepath: filePath
+        filepath: filePath,
       })
     } catch (error) {
       console.error('Prettier formatting error:', error)
@@ -254,15 +260,15 @@ class BuildTools {
     try {
       const result = await terser.minify(code, {
         compress: {
-          drop_console: this.config.mode === 'production'
+          drop_console: this.config.mode === 'production',
         },
-        mangle: true
+        mangle: true,
       })
-      
+
       if (result.error) {
         throw result.error
       }
-      
+
       return result.code || code
     } catch (error) {
       console.error('Terser minification error:', error)
@@ -278,17 +284,17 @@ class BuildTools {
   }> {
     console.log('Building with Webpack...')
     const webpackResult = await this.buildWithWebpack()
-    
+
     console.log('Building with Vite...')
     const viteResult = await this.buildWithVite()
-    
+
     console.log('Building with Rollup...')
     const rollupResult = await this.buildWithRollup()
 
     return {
       webpack: webpackResult,
       vite: viteResult,
-      rollup: rollupResult
+      rollup: rollupResult,
     }
   }
 
@@ -303,23 +309,23 @@ class BuildTools {
     mostChunks: string
   } {
     const builds = Object.entries(results)
-    
-    const fastest = builds.reduce((prev, current) => 
+
+    const fastest = builds.reduce((prev, current) =>
       prev[1].size < current[1].size ? prev : current
     )[0]
-    
-    const smallest = builds.reduce((prev, current) => 
+
+    const smallest = builds.reduce((prev, current) =>
       prev[1].size < current[1].size ? prev : current
     )[0]
-    
-    const mostChunks = builds.reduce((prev, current) => 
+
+    const mostChunks = builds.reduce((prev, current) =>
       prev[1].chunks > current[1].chunks ? prev : current
     )[0]
 
     return {
       fastest,
       smallest,
-      mostChunks
+      mostChunks,
     }
   }
 }
@@ -331,7 +337,7 @@ const main = async () => {
     output: './dist',
     mode: 'production',
     sourceMap: true,
-    minify: true
+    minify: true,
   }
 
   const buildTools = new BuildTools(config)
@@ -339,10 +345,10 @@ const main = async () => {
   try {
     // Build with all tools
     const results = await buildTools.buildAll()
-    
+
     // Compare results
     const comparison = buildTools.compareBuilds(results)
-    
+
     console.log('Build Results:')
     console.log('==============')
     Object.entries(results).forEach(([tool, result]) => {
@@ -363,21 +369,20 @@ const main = async () => {
     const lintResults = await buildTools.lintFiles([
       './src/index.ts',
       './src/utils.ts',
-      './src/components.ts'
+      './src/components.ts',
     ])
 
     console.log('\nLint Results:')
     console.log('=============')
-    lintResults.forEach(result => {
+    lintResults.forEach((result) => {
       console.log(`${result.file}:`)
       console.log(`  Errors: ${result.errors}`)
       console.log(`  Warnings: ${result.warnings}`)
       if (result.messages.length > 0) {
         console.log('  Messages:')
-        result.messages.forEach(msg => console.log(`    ${msg}`))
+        result.messages.forEach((msg) => console.log(`    ${msg}`))
       }
     })
-
   } catch (error) {
     console.error('Build failed:', error)
     process.exit(1)

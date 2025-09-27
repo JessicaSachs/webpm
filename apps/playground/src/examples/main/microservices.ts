@@ -33,7 +33,7 @@ class AuthServiceImpl implements AuthService {
 class ApiServiceImpl implements ApiService {
   private users: User[] = [
     { id: '1', name: 'John Doe', email: 'john@example.com' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com' }
+    { id: '2', name: 'Jane Smith', email: 'jane@example.com' },
   ]
 
   async getUsers(): Promise<User[]> {
@@ -43,7 +43,7 @@ class ApiServiceImpl implements ApiService {
   async createUser(user: Omit<User, 'id'>): Promise<User> {
     const newUser: User = {
       id: (this.users.length + 1).toString(),
-      ...user
+      ...user,
     }
     this.users.push(newUser)
     return newUser
@@ -59,7 +59,9 @@ class GatewayService {
 
   async handleRequest(req: any): Promise<any> {
     try {
-      const user = await this.authService.validateToken(req.headers.authorization)
+      const user = await this.authService.validateToken(
+        req.headers.authorization
+      )
       return await this.apiService.getUsers()
     } catch (error) {
       throw new Error('Unauthorized')
@@ -78,17 +80,14 @@ class ServiceFactory {
   }
 
   static createGateway(): GatewayService {
-    return new GatewayService(
-      this.createAuthService(),
-      this.createApiService()
-    )
+    return new GatewayService(this.createAuthService(), this.createApiService())
   }
 }
 
 // Example usage
 const gateway = ServiceFactory.createGateway()
 const result = await gateway.handleRequest({
-  headers: { authorization: 'valid-token' }
+  headers: { authorization: 'valid-token' },
 })
 
 console.log('Microservices result:', result)

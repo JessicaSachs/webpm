@@ -28,11 +28,7 @@
     "directories": {
       "output": "dist"
     },
-    "files": [
-      "src/**/*",
-      "renderer/dist/**/*",
-      "node_modules/**/*"
-    ],
+    "files": ["src/**/*", "renderer/dist/**/*", "node_modules/**/*"],
     "mac": {
       "category": "public.app-category.developer-tools"
     },

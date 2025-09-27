@@ -37,12 +37,12 @@ interface ApiResponse<T> {
 // Zod schemas for runtime validation
 const CreateUserSchema = z.object({
   email: z.string().email('Invalid email format'),
-  name: z.string().min(2, 'Name must be at least 2 characters')
+  name: z.string().min(2, 'Name must be at least 2 characters'),
 })
 
 const UpdateUserSchema = z.object({
   email: z.string().email('Invalid email format').optional(),
-  name: z.string().min(2, 'Name must be at least 2 characters').optional()
+  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
 })
 
 // Generic repository pattern with TypeScript
@@ -54,24 +54,26 @@ interface Repository<T, CreateInput, UpdateInput> {
   delete(id: number): Promise<boolean>
 }
 
-class UserRepository implements Repository<User, CreateUserRequest, UpdateUserRequest> {
+class UserRepository
+  implements Repository<User, CreateUserRequest, UpdateUserRequest>
+{
   constructor(private prisma: PrismaClient) {}
 
   async findAll(): Promise<User[]> {
     return this.prisma.user.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     })
   }
 
   async findById(id: number): Promise<User | null> {
     return this.prisma.user.findUnique({
-      where: { id }
+      where: { id },
     })
   }
 
   async create(input: CreateUserRequest): Promise<User> {
     return this.prisma.user.create({
-      data: input
+      data: input,
     })
   }
 
@@ -79,7 +81,7 @@ class UserRepository implements Repository<User, CreateUserRequest, UpdateUserRe
     try {
       return await this.prisma.user.update({
         where: { id },
-        data: input
+        data: input,
       })
     } catch {
       return null
@@ -89,7 +91,7 @@ class UserRepository implements Repository<User, CreateUserRequest, UpdateUserRe
   async delete(id: number): Promise<boolean> {
     try {
       await this.prisma.user.delete({
-        where: { id }
+        where: { id },
       })
       return true
     } catch {
@@ -108,12 +110,13 @@ class UserService {
       return {
         success: true,
         data: users,
-        message: 'Users retrieved successfully'
+        message: 'Users retrieved successfully',
       }
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
       }
     }
   }
@@ -124,18 +127,19 @@ class UserService {
       if (!user) {
         return {
           success: false,
-          error: 'User not found'
+          error: 'User not found',
         }
       }
       return {
         success: true,
         data: user,
-        message: 'User retrieved successfully'
+        message: 'User retrieved successfully',
       }
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
       }
     }
   }
@@ -144,54 +148,59 @@ class UserService {
     try {
       // Validate input with Zod
       const validatedInput = CreateUserSchema.parse(input)
-      
+
       const user = await this.userRepository.create(validatedInput)
       return {
         success: true,
         data: user,
-        message: 'User created successfully'
+        message: 'User created successfully',
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
         return {
           success: false,
-          error: error.errors.map(e => e.message).join(', ')
+          error: error.errors.map((e) => e.message).join(', '),
         }
       }
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
       }
     }
   }
 
-  async updateUser(id: number, input: UpdateUserRequest): Promise<ApiResponse<User>> {
+  async updateUser(
+    id: number,
+    input: UpdateUserRequest
+  ): Promise<ApiResponse<User>> {
     try {
       // Validate input with Zod
       const validatedInput = UpdateUserSchema.parse(input)
-      
+
       const user = await this.userRepository.update(id, validatedInput)
       if (!user) {
         return {
           success: false,
-          error: 'User not found'
+          error: 'User not found',
         }
       }
       return {
         success: true,
         data: user,
-        message: 'User updated successfully'
+        message: 'User updated successfully',
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
         return {
           success: false,
-          error: error.errors.map(e => e.message).join(', ')
+          error: error.errors.map((e) => e.message).join(', '),
         }
       }
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
       }
     }
   }
@@ -202,17 +211,18 @@ class UserService {
       if (!deleted) {
         return {
           success: false,
-          error: 'User not found'
+          error: 'User not found',
         }
       }
       return {
         success: true,
-        message: 'User deleted successfully'
+        message: 'User deleted successfully',
       }
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
       }
     }
   }
@@ -229,11 +239,16 @@ app.use(cors())
 app.use(express.json())
 
 // Error handling middleware
-const errorHandler = (error: Error, req: Request, res: Response, next: NextFunction) => {
+const errorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   console.error('Error:', error)
   res.status(500).json({
     success: false,
-    error: 'Internal server error'
+    error: 'Internal server error',
   })
 }
 
@@ -251,56 +266,74 @@ app.get('/api/users', async (req: Request, res: Response) => {
   res.status(result.success ? 200 : 400).json(result)
 })
 
-app.get('/api/users/:id', async (req: Request<{ id: string }>, res: Response) => {
-  const id = parseInt(req.params.id)
-  if (isNaN(id)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid user ID'
-    })
-  }
-  
-  const result = await userService.getUserById(id)
-  res.status(result.success ? 200 : 404).json(result)
-})
+app.get(
+  '/api/users/:id',
+  async (req: Request<{ id: string }>, res: Response) => {
+    const id = parseInt(req.params.id)
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID',
+      })
+    }
 
-app.post('/api/users', async (req: Request<{}, ApiResponse<User>, CreateUserRequest>, res: Response) => {
-  const result = await userService.createUser(req.body)
-  res.status(result.success ? 201 : 400).json(result)
-})
-
-app.put('/api/users/:id', async (req: Request<{ id: string }, ApiResponse<User>, UpdateUserRequest>, res: Response) => {
-  const id = parseInt(req.params.id)
-  if (isNaN(id)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid user ID'
-    })
+    const result = await userService.getUserById(id)
+    res.status(result.success ? 200 : 404).json(result)
   }
-  
-  const result = await userService.updateUser(id, req.body)
-  res.status(result.success ? 200 : 400).json(result)
-})
+)
 
-app.delete('/api/users/:id', async (req: Request<{ id: string }>, res: Response) => {
-  const id = parseInt(req.params.id)
-  if (isNaN(id)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid user ID'
-    })
+app.post(
+  '/api/users',
+  async (
+    req: Request<{}, ApiResponse<User>, CreateUserRequest>,
+    res: Response
+  ) => {
+    const result = await userService.createUser(req.body)
+    res.status(result.success ? 201 : 400).json(result)
   }
-  
-  const result = await userService.deleteUser(id)
-  res.status(result.success ? 200 : 404).json(result)
-})
+)
+
+app.put(
+  '/api/users/:id',
+  async (
+    req: Request<{ id: string }, ApiResponse<User>, UpdateUserRequest>,
+    res: Response
+  ) => {
+    const id = parseInt(req.params.id)
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID',
+      })
+    }
+
+    const result = await userService.updateUser(id, req.body)
+    res.status(result.success ? 200 : 400).json(result)
+  }
+)
+
+app.delete(
+  '/api/users/:id',
+  async (req: Request<{ id: string }>, res: Response) => {
+    const id = parseInt(req.params.id)
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID',
+      })
+    }
+
+    const result = await userService.deleteUser(id)
+    res.status(result.success ? 200 : 404).json(result)
+  }
+)
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.json({
     success: true,
     message: 'Server is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   })
 })
 

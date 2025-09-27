@@ -21,15 +21,15 @@ class StackManager {
   }
 
   getService(name: string): Service | undefined {
-    return this.config.services.find(service => service.name === name)
+    return this.config.services.find((service) => service.name === name)
   }
 
   getDependencies(serviceName: string): Service[] {
     const service = this.getService(serviceName)
     if (!service) return []
-    
+
     return service.dependencies
-      .map(depName => this.getService(depName))
+      .map((depName) => this.getService(depName))
       .filter((service): service is Service => service !== undefined)
   }
 }
@@ -40,8 +40,8 @@ const stackConfig: StackConfig = {
   version: '1.0.0',
   services: [
     { name: 'api', port: 3000, dependencies: ['database'] },
-    { name: 'database', port: 5432, dependencies: [] }
-  ]
+    { name: 'database', port: 5432, dependencies: [] },
+  ],
 }
 
 const manager = new StackManager(stackConfig)

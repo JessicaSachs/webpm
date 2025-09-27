@@ -28,7 +28,7 @@ interface Array<T> {
 }
 
 // Implementation
-Array.prototype.customMethod = function<T>(this: T[]): T[] {
+Array.prototype.customMethod = function <T>(this: T[]): T[] {
   return this.filter((item, index) => this.indexOf(item) === index)
 }
 
