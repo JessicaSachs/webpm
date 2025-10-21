@@ -15,6 +15,7 @@
     "@unhead/vue": "^2.0.17",
     "@webpm/npm-resolver": "workspace:*",
     "@webpm/webpm": "workspace:*",
+    "@webpm/store": "workspace:*",
     "date-fns": "^4.1.0",
     "fflate": "^0.8.2",
     "monaco-editor": "^0.53.0",
@@ -29,6 +30,7 @@
     "eslint": "catalog:",
     "rollup-plugin-natives": "^0.7.8",
     "rollup-plugin-polyfill-node": "^0.13.0",
+    "tailwindcss": "^4.1.15",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-node-polyfills": "^0.24.0"
