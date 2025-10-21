@@ -134,7 +134,7 @@ export class TarballFetcher {
       logger.debug("Extracting tarball using tar-stream...");
 
       const files: ExtractedFile[] = [];
-      let manifest: Record<string, unknown> | null = null;
+      let manifest: { scripts?: { preinstall?: string; install?: string; postinstall?: string } } | null = null;
       let hasInstallScript = false;
 
       return new Promise((resolve, reject) => {
@@ -175,14 +175,14 @@ export class TarballFetcher {
             ) {
               try {
                 const manifestText = fileBuffer.toString("utf8");
-                manifest = JSON.parse(manifestText);
+                manifest = JSON.parse(manifestText)
 
                 // Check for install scripts
                 if (
-                  manifest.scripts &&
-                  (manifest.scripts.preinstall ||
-                    manifest.scripts.install ||
-                    manifest.scripts.postinstall)
+                  manifest?.scripts &&
+                  (manifest?.scripts.preinstall ||
+                    manifest?.scripts.install ||
+                    manifest?.scripts.postinstall)
                 ) {
                   hasInstallScript = true;
                 }
@@ -204,7 +204,7 @@ export class TarballFetcher {
           logger.debug(`Extracted ${files.length} files from tarball`);
           resolve({
             files,
-            manifest,
+            manifest: manifest ?? undefined,
             hasInstallScript,
           });
         });
@@ -278,7 +278,7 @@ export class TarballFetcher {
         if (!current[part]) {
           current[part] = {};
         }
-        current = current[part];
+        current = current[part] as Record<string, unknown>;
       }
 
       const fileName = pathParts[pathParts.length - 1];

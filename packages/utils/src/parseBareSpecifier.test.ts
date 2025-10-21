@@ -14,7 +14,7 @@ describe('normalizeSpecifier', () => {
       registry,
       defaultTag,
       alias: 'react',
-      rawSpecifier: '^18.0.0',
+      bareSpecifier: '^18.0.0',
     })
 
     expect(result).toEqual({
@@ -29,7 +29,7 @@ describe('normalizeSpecifier', () => {
       registry,
       defaultTag,
       alias: 'my-alias',
-      rawSpecifier: 'npm:react@^18.0.0',
+      bareSpecifier: 'npm:react@^18.0.0',
     })
 
     expect(result).toEqual({
@@ -44,7 +44,7 @@ describe('normalizeSpecifier', () => {
       registry,
       defaultTag,
       alias: 'react',
-      rawSpecifier: '',
+      bareSpecifier: '',
     })
 
     expect(result).toEqual({
@@ -59,7 +59,7 @@ describe('normalizeSpecifier', () => {
       registry,
       defaultTag,
       alias: 'test-package',
-      rawSpecifier: '',
+      bareSpecifier: '',
     })
 
     expect(result).toEqual({
@@ -75,7 +75,7 @@ describe('normalizeSpecifier', () => {
       registry,
       defaultTag: customTag,
       alias: 'react',
-      rawSpecifier: '',
+      bareSpecifier: '',
     })
 
     expect(result).toEqual({
@@ -90,7 +90,7 @@ describe('normalizeSpecifier', () => {
       registry,
       defaultTag,
       alias: '@types/node',
-      rawSpecifier: '^20.0.0',
+      bareSpecifier: '^20.0.0',
     })
 
     expect(result).toEqual({

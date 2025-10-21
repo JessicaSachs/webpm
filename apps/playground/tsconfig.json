@@ -27,6 +27,11 @@
     "auto-imports.d.ts",
     "components.d.ts"
   ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/examples"
+  ],
   "references": [
     {
       "path": "./tsconfig.node.json"

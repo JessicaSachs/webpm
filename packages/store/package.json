@@ -26,9 +26,11 @@
     "dev": "bunchee --watch --external=tar-stream",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "test": "vitest --project logger"
+    "test": "vitest --project logger",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@isomorphic-git/lightning-fs": "^4.6.2",
     "@webpm/environment": "workspace:*",
     "@webpm/logger": "workspace:*",
     "@webpm/registry": "workspace:*",

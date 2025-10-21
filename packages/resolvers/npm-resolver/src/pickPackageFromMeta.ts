@@ -9,6 +9,7 @@ import {
   RegistryPackageSpecifier,
   WantedDependency,
 } from '@webpm/types'
+import { whichVersionIsPinned } from '@webpm/utils'
 import semver from 'semver'
 import util from 'util'
 import { type PackageInRegistry, type PackageMeta } from './pickPackage'
@@ -72,6 +73,8 @@ export function pickPackageFromMeta(
   } catch (err: unknown) {
     if (
       util.types.isNativeError(err) &&
+      err !== null &&
+      typeof err === 'object' &&
       'code' in err &&
       typeof err.code === 'string' &&
       err.code.startsWith('ERR_PNPM_')
@@ -260,6 +263,26 @@ class PreferredVersionsPrioritizer {
     return Object.keys(versionsByWeight)
       .sort((a, b) => parseInt(b, 10) - parseInt(a, 10))
       .map((weight) => versionsByWeight[parseInt(weight, 10)])
+  }
+}
+
+function createVersionSpec(
+  version: string,
+  pinnedVersion?: PinnedVersion
+): string {
+  switch (pinnedVersion ?? 'major') {
+    case 'none':
+    case 'major':
+      return `^${version}`
+    case 'minor':
+      return `~${version}`
+    case 'patch':
+      return version
+    default:
+      throw new WebpmError(
+        'BAD_PINNED_VERSION',
+        `Cannot pin '${pinnedVersion ?? 'undefined'}'`
+      )
   }
 }
 

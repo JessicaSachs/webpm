@@ -1,0 +1,33 @@
+{
+  "name": "nuxt-playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "echo 'Not implemented'",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.68",
+    "@iconify-json/simple-icons": "^1.2.52",
+    "@iconify-json/vscode-icons": "^1.1.0",
+    "@nuxt/ui": "^4.0.0-alpha.2",
+    "@webpm/npm-resolver": "workspace:*",
+    "@webpm/webpm": "workspace:*",
+    "nuxt": "^4.1.2",
+    "nuxt-monaco-editor": "1.4.0",
+    "tailwindcss": "^4.1.13"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.9.0",
+    "@webpm/eslint-config": "workspace:*",
+    "@webpm/typescript-config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vue-tsc": "^3.0.7"
+  }
+}

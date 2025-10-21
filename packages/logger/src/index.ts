@@ -14,7 +14,7 @@ loggerEnv.updateConfig({
 })
 
 const getLogLevelFromEnv = (): LogLevel | undefined => {
-  const logLevel = loggerEnv.getNumber('LOG_LEVEL')
+  const logLevel = loggerEnv.getNumber('LOG_LEVEL', 3)
   if (logLevel !== undefined && logLevel >= 0 && logLevel <= 5) {
     return logLevel as LogLevel
   }

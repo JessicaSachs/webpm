@@ -22,5 +22,8 @@
     "globals": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:"
+  },
+  "scripts": {
+    "clean": "rm -rf dist"
   }
 }

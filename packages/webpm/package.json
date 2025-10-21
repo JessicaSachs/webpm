@@ -26,7 +26,8 @@
     "dev": "bunchee --watch",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "test": "vitest --project webpm"
+    "test": "vitest --project webpm",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@webpm/environment": "workspace:*",

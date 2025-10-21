@@ -2,7 +2,7 @@ import { defineProject } from 'vitest/config'
 
 export default defineProject({
   test: {
-    name: 'logger',
+    name: 'store',
     environment: 'node',
     globals: true,
   },

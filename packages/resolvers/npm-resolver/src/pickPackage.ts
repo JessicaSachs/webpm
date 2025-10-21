@@ -18,10 +18,32 @@ import semver from 'semver'
 import {
   pickPackageFromMeta,
   pickVersionByVersionRange,
+  type PickVersionByVersionRange,
 } from './pickPackageFromMeta'
 
 const loadJsonFile = async <T>(_path: string): Promise<T | null> => {
   return null
+}
+
+const pickLowestVersionByVersionRange: PickVersionByVersionRange = (
+  meta,
+  versionRange,
+  preferredVerSels,
+  publishedBy
+) => {
+  let versions = Object.keys(meta.versions)
+  if (publishedBy) {
+    if (meta.time == null) {
+      throw new WebpmError(
+        'MISSING_TIME',
+        `The metadata of ${meta.name} is missing the "time" field`
+      )
+    }
+    versions = versions.filter(
+      (version) => new Date(meta.time![version]) <= publishedBy
+    )
+  }
+  return semver.minSatisfying(versions, versionRange, true)
 }
 
 export interface PackageMeta {
@@ -331,6 +353,7 @@ function clearMeta(pkg: PackageMeta): PackageMeta {
     // The list taken from https://github.com/npm/registry/blob/master/docs/responses/package-metadata.md#abbreviated-version-object
     // with the addition of 'libc'
     versions[version] = pick(
+      info,
       [
         'name',
         'version',
@@ -350,8 +373,7 @@ function clearMeta(pkg: PackageMeta): PackageMeta {
         'bundleDependencies',
         'bundledDependencies',
         'hasInstallScript',
-      ],
-      info
+      ]
     )
   }
 

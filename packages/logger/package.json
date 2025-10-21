@@ -26,7 +26,8 @@
     "dev": "bunchee --watch --no-external",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "test": "vitest --project logger"
+    "test": "vitest --project logger",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@webpm/environment": "workspace:*",

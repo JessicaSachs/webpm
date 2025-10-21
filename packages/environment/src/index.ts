@@ -44,10 +44,10 @@ export const isDevelopment = () => env.isDevelopment()
 export const isProduction = () => env.isProduction()
 export const isTest = () => env.isTest()
 export const get = (key: string, defaultValue?: string) =>
-  env.get(key, defaultValue)
+  env.get(key, defaultValue ?? '')
 export const getNumber = (key: string, defaultValue?: number) =>
-  env.getNumber(key, defaultValue)
+  env.getNumber(key, defaultValue ?? 0)
 export const getBoolean = (key: string, defaultValue?: boolean) =>
-  env.getBoolean(key, defaultValue)
+  env.getBoolean(key, defaultValue ?? false)
 export const getArray = (key: string, defaultValue?: string[]) =>
   env.getArray(key, defaultValue)

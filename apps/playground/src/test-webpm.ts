@@ -40,7 +40,7 @@ export async function testPackageJsonResolution() {
 // Test TypeScript VFS integration
 export async function testTypeScriptVFS() {
   try {
-    const { createSystem, createDefaultMapFromCDN, createVirtualCompilerHost } =
+    const { createSystem, createDefaultMapFromCDN } =
       await import('@typescript/vfs')
     const ts = await import('typescript')
 
@@ -51,7 +51,7 @@ export async function testTypeScriptVFS() {
       true,
       ts
     )
-    const system = createSystem(fsMap)
+    createSystem(fsMap)
 
     console.log('TypeScript VFS created successfully')
     return true

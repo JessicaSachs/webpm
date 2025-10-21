@@ -26,11 +26,10 @@
     "dev": "bunchee --watch --no-external",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "clean": "rm -rf dist"
   },
-  "dependencies": {
-    
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "catalog:",
     "@webpm/eslint-config": "workspace:*",

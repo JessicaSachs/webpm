@@ -21,12 +21,12 @@ export function normalizeSpecifier({
 }
 
 export function defaultTagForAlias(
-  alias: string,
+  alias: string | undefined,
   defaultTag: string
 ): RegistryPackageSpecifier {
   return {
     fetchSpec: defaultTag,
-    name: alias,
+    name: alias ?? 'latest',
     type: 'tag',
   }
 }

@@ -26,7 +26,8 @@
     "dev": "bunchee --watch --no-external",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "clean": "rm -rf dist"
   },
   "devDependencies": {
     "@webpm/eslint-config": "workspace:*",
