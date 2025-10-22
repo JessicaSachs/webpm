@@ -2,12 +2,12 @@ import { logger } from '@webpm/logger'
 import { env } from '@webpm/environment'
 import { NPMRegistry } from '@webpm/registry'
 import type { PackageMetadata } from '@webpm/registry'
-import { 
-  resolvePackageTree, 
+import {
+  resolvePackageTree,
   resolveAndFetchPackage,
   resolveAndFetchWantedDependencies,
   getWantedDependenciesFromPackageJson,
-  type DependencyTreeNode, 
+  type DependencyTreeNode,
   type FetchedDependencyTree,
   type FetchedPackage,
   type PackageJsonManifest,
@@ -163,6 +163,9 @@ export class WebPM {
   private config: WebpmConfig
   private registry: NPMRegistry
 
+  // Track the number of active operations
+  private _activeOperations: number = 0
+
   constructor(config: Partial<WebpmConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config }
     this.registry = new NPMRegistry({
@@ -170,12 +173,38 @@ export class WebPM {
     })
   }
 
-  init(): Promise<void> {
-    return this.registry.init().then((registry) => {
-      logger.info('WebPM initialized', { config: this.config, registry })
-    })
+  /**
+   * Returns true if WebPM is currently busy (performing one or more async operations)
+   */
+  get isBusy(): boolean {
+    return this._activeOperations > 0
   }
 
+  /**
+   * For advanced use: get number of active async operations
+   */
+  get activeOperations(): number {
+    return this._activeOperations
+  }
+
+  private _wrapBusy<T>(promiseFactory: () => Promise<T>): Promise<T> {
+    this._activeOperations++
+    const maybePromise = promiseFactory()
+    // In case promiseFactory throws synchronously, handle accordingly:
+    const onDone = () => { this._activeOperations = Math.max(0, this._activeOperations - 1) }
+    if (!(maybePromise && typeof maybePromise.then === "function")) {
+      // Not a promise; decrement count and rethrow
+      onDone()
+      throw new Error('Operation did not return a promise.')
+    }
+    return maybePromise.finally(onDone)
+  }
+
+  init(): Promise<void> {
+    return this._wrapBusy(() => this.registry.init().then((registry) => {
+      logger.info('WebPM initialized', { config: this.config, registry })
+    }))
+  }
 
   /**
    * Get package information from npm registry
@@ -187,19 +216,21 @@ export class WebPM {
       throw new Error('Package name cannot be empty')
     }
 
-    return this.registry
-      .getLatestVersion(packageName)
-      .then((metadata) => {
-        logger.info('Package info fetched successfully', {
-          packageName,
-          version: metadata.version,
+    return this._wrapBusy(() =>
+      this.registry
+        .getLatestVersion(packageName)
+        .then((metadata) => {
+          logger.info('Package info fetched successfully', {
+            packageName,
+            version: metadata.version,
+          })
+          return metadata
         })
-        return metadata
-      })
-      .catch((error) => {
-        logger.error('Failed to fetch package info', { packageName, error })
-        throw error
-      })
+        .catch((error) => {
+          logger.error('Failed to fetch package info', { packageName, error })
+          throw error
+        })
+    )
   }
 
   /**
@@ -216,42 +247,44 @@ export class WebPM {
       throw new Error('Package name cannot be empty')
     }
 
-    try {
-      const response = await this.fetchWithRetry(
-        `${this.config.registry}/${packageName}`
-      )
-      const data = (await response.json()) as NpmRegistryResponse
-
-      const targetVersion = version || data['dist-tags']?.latest
-      const versionData = data.versions?.[targetVersion]
-
-      if (!versionData) {
-        throw new Error(
-          `Version ${targetVersion} not found for package ${packageName}`
+    return this._wrapBusy(async () => {
+      try {
+        const response = await this.fetchWithRetry(
+          `${this.config.registry}/${packageName}`
         )
-      }
+        const data = (await response.json()) as NpmRegistryResponse
 
-      const packageVersion: PackageVersion = {
-        version: versionData.version,
-        dist: versionData.dist,
-        dependencies: versionData.dependencies,
-        devDependencies: versionData.devDependencies,
-        peerDependencies: versionData.peerDependencies,
-      }
+        const targetVersion = version || data['dist-tags']?.latest
+        const versionData = data.versions?.[targetVersion]
 
-      logger.info('Package version fetched successfully', {
-        packageName,
-        version: targetVersion,
-      })
-      return packageVersion
-    } catch (error) {
-      logger.error('Failed to fetch package version', {
-        packageName,
-        version,
-        error,
-      })
-      throw error
-    }
+        if (!versionData) {
+          throw new Error(
+            `Version ${targetVersion} not found for package ${packageName}`
+          )
+        }
+
+        const packageVersion: PackageVersion = {
+          version: versionData.version,
+          dist: versionData.dist,
+          dependencies: versionData.dependencies,
+          devDependencies: versionData.devDependencies,
+          peerDependencies: versionData.peerDependencies,
+        }
+
+        logger.info('Package version fetched successfully', {
+          packageName,
+          version: targetVersion,
+        })
+        return packageVersion
+      } catch (error) {
+        logger.error('Failed to fetch package version', {
+          packageName,
+          version,
+          error,
+        })
+        throw error
+      }
+    })
   }
 
   /**
@@ -263,45 +296,47 @@ export class WebPM {
     packageName: string,
     options: InstallOptions = {}
   ): Promise<DependencyTreeNode | null> {
-    logger.info('Installing package', { packageName, options })
+    return this._wrapBusy(async () => {
+      logger.info('Installing package', { packageName, options })
 
-    try {
-      // Create registry instance
-      const registry = new NPMRegistry({
-        url: options.registry || this.config.registry,
-        timeout: this.config.timeout,
-        maxRetries: this.config.retries,
-      })
+      try {
+        // Create registry instance
+        const registry = new NPMRegistry({
+          url: options.registry || this.config.registry,
+          timeout: this.config.timeout,
+          maxRetries: this.config.retries,
+        })
 
-      // Determine package version
-      const packageVersion = options.version || 'latest'
+        // Determine package version
+        const packageVersion = options.version || 'latest'
 
-      // Resolve package and all its dependencies
-      const dependencyTree = await resolvePackageTree(
-        packageName,
-        packageVersion,
-        registry,
-        {
-          maxDepth: 10,
-          currentDepth: 0,
-          parentIds: [],
+        // Resolve package and all its dependencies
+        const dependencyTree = await resolvePackageTree(
+          packageName,
+          packageVersion,
+          registry,
+          {
+            maxDepth: 10,
+            currentDepth: 0,
+            parentIds: [],
+          }
+        )
+
+        if (!dependencyTree) {
+          logger.error(`Failed to resolve package ${packageName}@${packageVersion}`)
+          return null
         }
-      )
 
-      if (!dependencyTree) {
-        logger.error(`Failed to resolve package ${packageName}@${packageVersion}`)
-        return null
+        logger.info(`Successfully resolved package tree for ${packageName}@${packageVersion}`)
+        this.logDependencyTree(dependencyTree)
+
+        return dependencyTree
+
+      } catch (error) {
+        logger.error(`Failed to install package ${packageName}:`, error)
+        throw error
       }
-
-      logger.info(`Successfully resolved package tree for ${packageName}@${packageVersion}`)
-      this.logDependencyTree(dependencyTree)
-
-      return dependencyTree
-
-    } catch (error) {
-      logger.error(`Failed to install package ${packageName}:`, error)
-      throw error
-    }
+    })
   }
 
   /**
@@ -313,49 +348,51 @@ export class WebPM {
     packageName: string,
     options: InstallOptions & { maxConcurrent?: number } = {}
   ): Promise<FetchedDependencyTree | null> {
-    logger.info('Installing and fetching package', { packageName, options })
+    return this._wrapBusy(async () => {
+      logger.info('Installing and fetching package', { packageName, options })
 
-    try {
-      // Create registry instance
-      const registry = new NPMRegistry({
-        url: options.registry || this.config.registry,
-        timeout: this.config.timeout,
-        maxRetries: this.config.retries,
-      })
-      
-      // Resolve, fetch, and extract all packages
-      const fetchedTree = await resolveAndFetchPackage(
-        packageName,
-        options.version || 'latest',
-        registry,
-        {
-          maxDepth: 10,
-          maxConcurrent: options.maxConcurrent || this.config.concurrency,
+      try {
+        // Create registry instance
+        const registry = new NPMRegistry({
+          url: options.registry || this.config.registry,
+          timeout: this.config.timeout,
+          maxRetries: this.config.retries,
+        })
+
+        // Resolve, fetch, and extract all packages
+        const fetchedTree = await resolveAndFetchPackage(
+          packageName,
+          options.version || 'latest',
+          registry,
+          {
+            maxDepth: 10,
+            maxConcurrent: options.maxConcurrent || this.config.concurrency,
+          }
+        )
+
+        if (!fetchedTree) {
+          logger.error(`Failed to resolve and fetch dependencies for ${packageName}`)
+          return null
         }
-      )
 
-      if (!fetchedTree) {
-        logger.error(`Failed to resolve and fetch dependencies for ${packageName}`)
-        return null
+        logger.info(`Successfully installed and fetched ${packageName} with ${fetchedTree.totalPackages} packages and ${fetchedTree.totalFiles} files`)
+
+        // Log timing summary
+        const { timings } = fetchedTree;
+        logger.info(`Installation timing summary:`);
+        logger.info(`  Total time: ${timings.totalTime.toFixed(2)}ms`);
+        logger.info(`  Resolution: ${timings.resolutionTime.toFixed(2)}ms`);
+        logger.info(`  Fetching: ${timings.fetchingTime.toFixed(2)}ms`);
+        logger.info(`  Extraction: ${timings.extractionTime.toFixed(2)}ms`);
+        logger.info(`  Average per package: ${(timings.fetchingTime / fetchedTree.totalPackages).toFixed(2)}ms`);
+
+        return fetchedTree
+
+      } catch (error) {
+        logger.error(`Failed to install and fetch package ${packageName}:`, error)
+        throw error
       }
-
-      logger.info(`Successfully installed and fetched ${packageName} with ${fetchedTree.totalPackages} packages and ${fetchedTree.totalFiles} files`)
-      
-      // Log timing summary
-      const { timings } = fetchedTree;
-      logger.info(`Installation timing summary:`);
-      logger.info(`  Total time: ${timings.totalTime.toFixed(2)}ms`);
-      logger.info(`  Resolution: ${timings.resolutionTime.toFixed(2)}ms`);
-      logger.info(`  Fetching: ${timings.fetchingTime.toFixed(2)}ms`);
-      logger.info(`  Extraction: ${timings.extractionTime.toFixed(2)}ms`);
-      logger.info(`  Average per package: ${(timings.fetchingTime / fetchedTree.totalPackages).toFixed(2)}ms`);
-      
-      return fetchedTree
-
-    } catch (error) {
-      logger.error(`Failed to install and fetch package ${packageName}:`, error)
-      throw error
-    }
+    })
   }
 
   /**
@@ -369,151 +406,155 @@ export class WebPM {
     handler: UntarHandler = {},
     options: ResolvePackageJsonOptions = {}
   ): Promise<InstallationResult> {
-    const startTime = performance.now()
-    
-    try {
-      logger.info('Starting installation with untar handler', { 
-        packageName: packageJson.name,
-        options 
-      })
+    return this._wrapBusy(async () => {
+      const startTime = performance.now()
 
-      // Create registry instance
-      const registry = new NPMRegistry({
-        url: this.config.registry,
-        timeout: this.config.timeout,
-        maxRetries: this.config.retries,
-      })
+      try {
+        logger.info('Starting installation with untar handler', {
+          packageName: packageJson.name,
+          options
+        })
 
-      // Extract wanted dependencies from package.json
-      const wantedDependencies = getWantedDependenciesFromPackageJson(packageJson, options)
-      
-      if (wantedDependencies.length === 0) {
-        const result: InstallationResult = {
-          success: true,
-          totalPackages: 0,
-          totalFiles: 0,
-          totalSize: 0,
-          allPackages: [],
-          timings: {
-            totalTime: performance.now() - startTime,
-            resolutionTime: 0,
-            fetchingTime: 0,
-            extractionTime: 0
-          },
-          statistics: {
-            averageExtractionTime: 0,
-            fastestExtraction: 0,
-            slowestExtraction: 0,
-            largestPackage: { name: '', size: 0 },
-            smallestPackage: { name: '', size: 0 }
-          }
-        }
-        
-        handler.onComplete?.(result)
-        return result
-      }
+        // Create registry instance
+        const registry = new NPMRegistry({
+          url: this.config.registry,
+          timeout: this.config.timeout,
+          maxRetries: this.config.retries,
+        })
 
-      // Collect all packages from all dependency trees
-      const allPackages: FetchedPackage[] = []
-      let totalResolutionTime = 0
-      let totalFetchingTime = 0
-      let totalExtractionTime = 0
+        // Extract wanted dependencies from package.json
+        const wantedDependencies = getWantedDependenciesFromPackageJson(packageJson, options)
 
-      // Process dependencies with progress tracking
-      for (let i = 0; i < wantedDependencies.length; i++) {
-        const wantedDep = wantedDependencies[i]
-        const depType = wantedDep.dev ? 'dev' : (wantedDep.optional ? 'optional' : 'prod')
-        
-        logger.info(`Processing ${depType} dependency: ${wantedDep.alias}@${wantedDep.bareSpecifier}`)
-        
-        try {
-          const result = await resolveAndFetchPackage(
-            wantedDep.alias, 
-            wantedDep.bareSpecifier, 
-            registry, 
-            {
-              maxConcurrent: options.maxConcurrent || this.config.concurrency
+        if (wantedDependencies.length === 0) {
+          const result: InstallationResult = {
+            success: true,
+            totalPackages: 0,
+            totalFiles: 0,
+            totalSize: 0,
+            allPackages: [],
+            timings: {
+              totalTime: performance.now() - startTime,
+              resolutionTime: 0,
+              fetchingTime: 0,
+              extractionTime: 0
+            },
+            statistics: {
+              averageExtractionTime: 0,
+              fastestExtraction: 0,
+              slowestExtraction: 0,
+              largestPackage: { name: '', size: 0 },
+              smallestPackage: { name: '', size: 0 }
             }
-          )
-          
-          if (result && result.allFetchedPackages) {
-            const packages = Array.from(result.allFetchedPackages.values())
-            allPackages.push(...packages)
-            
-            // Accumulate timing
-            totalResolutionTime += result.timings.resolutionTime
-            totalFetchingTime += result.timings.fetchingTime
-            totalExtractionTime += result.timings.extractionTime
-            
-            // Send progress event for each package
-            for (const pkg of packages) {
-              const currentProgress = this.calculateCurrentProgress(allPackages)
-              
+          }
+
+          handler.onComplete?.(result)
+          return result
+        }
+
+        // Collect all packages from all dependency trees
+        const allPackages: FetchedPackage[] = []
+        let totalResolutionTime = 0
+        let totalFetchingTime = 0
+        let totalExtractionTime = 0
+
+        // Process dependencies with progress tracking
+        for (let i = 0; i < wantedDependencies.length; i++) {
+          const wantedDep = wantedDependencies[i]
+          const depType = wantedDep.dev ? 'dev' : (wantedDep.optional ? 'optional' : 'prod')
+
+          logger.info(`Processing ${depType} dependency: ${wantedDep.alias}@${wantedDep.bareSpecifier}`)
+
+          try {
+            console.log(`🔍 installWithUntarHandler: calling resolveAndFetchPackage with autoInstallPeers = ${options.autoInstallPeers}`)
+            const result = await resolveAndFetchPackage(
+              wantedDep.alias,
+              wantedDep.bareSpecifier,
+              registry,
+              {
+                maxConcurrent: options.maxConcurrent || this.config.concurrency,
+                autoInstallPeers: options.autoInstallPeers
+              }
+            )
+
+            if (result && result.allFetchedPackages) {
+              const packages = Array.from(result.allFetchedPackages.values())
+              allPackages.push(...packages)
+
+              // Accumulate timing
+              totalResolutionTime += result.timings.resolutionTime
+              totalFetchingTime += result.timings.fetchingTime
+              totalExtractionTime += result.timings.extractionTime
+
+              // Send progress event for each package
+              for (const pkg of packages) {
+                const currentProgress = this.calculateCurrentProgress(allPackages)
+
+                handler.onProgress?.({
+                  type: 'package-extracted',
+                  packageName: pkg.package.name,
+                  packageVersion: pkg.package.version,
+                  extractedFiles: pkg.extractedFiles.files.length,
+                  currentProgress
+                })
+              }
+
+              // Send batch complete event
               handler.onProgress?.({
-                type: 'package-extracted',
-                packageName: pkg.package.name,
-                packageVersion: pkg.package.version,
-                extractedFiles: pkg.extractedFiles.files.length,
-                currentProgress
+                type: 'batch-complete',
+                currentProgress: this.calculateCurrentProgress(allPackages),
+                batchInfo: {
+                  batchIndex: i + 1,
+                  batchTotal: wantedDependencies.length,
+                  packagesInBatch: packages.length
+                }
               })
             }
-            
-            // Send batch complete event
-            handler.onProgress?.({
-              type: 'batch-complete',
-              currentProgress: this.calculateCurrentProgress(allPackages),
-              batchInfo: {
-                batchIndex: i + 1,
-                batchTotal: wantedDependencies.length,
-                packagesInBatch: packages.length
-              }
-            })
-          }
-        } catch (error) {
-          if (wantedDep.optional) {
-            logger.warn(`Optional dependency ${wantedDep.alias}@${wantedDep.bareSpecifier} failed:`, error)
-          } else {
-            throw error
+          } catch (error) {
+            if (wantedDep.optional) {
+              logger.warn(`Optional dependency ${wantedDep.alias}@${wantedDep.bareSpecifier} failed:`, error)
+            } else {
+              throw error
+            }
           }
         }
-      }
 
-      // Calculate final statistics
-      const totalTime = performance.now() - startTime
-      const statistics = this.calculateStatistics(allPackages)
-      const currentProgress = this.calculateCurrentProgress(allPackages)
-      
-      const installationResult: InstallationResult = {
-        success: true,
-        totalPackages: currentProgress.totalPackages,
-        totalFiles: currentProgress.totalFiles,
-        totalSize: currentProgress.totalSize,
-        allPackages,
-        timings: {
-          totalTime,
-          resolutionTime: totalResolutionTime,
-          fetchingTime: totalFetchingTime,
-          extractionTime: totalExtractionTime
-        },
-        statistics
-      }
+        // Calculate final statistics
+        const totalTime = performance.now() - startTime
+        const statistics = this.calculateStatistics(allPackages)
+        const currentProgress = this.calculateCurrentProgress(allPackages)
 
-      // Send final completion event
-      handler.onProgress?.({
-        type: 'installation-complete',
-        currentProgress
-      })
-      
-      handler.onComplete?.(installationResult)
-      
-      logger.info(`Installation complete: ${installationResult.totalPackages} packages, ${installationResult.totalFiles} files`)
-      return installationResult
-      
-    } catch (error) {
-      const installationError = error instanceof Error ? error : new Error('Unknown installation error')
-      handler.onError?.(installationError)
-      throw installationError
-    }
+        const installationResult: InstallationResult = {
+          success: true,
+          totalPackages: currentProgress.totalPackages,
+          totalFiles: currentProgress.totalFiles,
+          totalSize: currentProgress.totalSize,
+          allPackages,
+          timings: {
+            totalTime,
+            resolutionTime: totalResolutionTime,
+            fetchingTime: totalFetchingTime,
+            extractionTime: totalExtractionTime
+          },
+          statistics
+        }
+
+        // Send final completion event
+        handler.onProgress?.({
+          type: 'installation-complete',
+          currentProgress
+        })
+
+        handler.onComplete?.(installationResult)
+
+        logger.info(`Installation complete: ${installationResult.totalPackages} packages, ${installationResult.totalFiles} files`)
+        return installationResult
+
+      } catch (error) {
+        const installationError = error instanceof Error ? error : new Error('Unknown installation error')
+        handler.onError?.(installationError)
+        throw installationError
+      }
+    })
   }
 
   /**
@@ -524,7 +565,7 @@ export class WebPM {
     const totalSize = allPackages.reduce((sum, pkg) => {
       return sum + pkg.extractedFiles.files.reduce((fileSum: number, file: any) => fileSum + file.size, 0)
     }, 0)
-    
+
     return {
       totalPackages: allPackages.length,
       totalFiles,
@@ -559,8 +600,8 @@ export class WebPM {
     const sortedSizes = packageSizes.sort((a, b) => b.size - a.size)
 
     return {
-      averageExtractionTime: extractionTimes.length > 0 
-        ? extractionTimes.reduce((sum, time) => sum + time, 0) / extractionTimes.length 
+      averageExtractionTime: extractionTimes.length > 0
+        ? extractionTimes.reduce((sum, time) => sum + time, 0) / extractionTimes.length
         : 0,
       fastestExtraction: extractionTimes.length > 0 ? Math.min(...extractionTimes) : 0,
       slowestExtraction: extractionTimes.length > 0 ? Math.max(...extractionTimes) : 0,
@@ -578,64 +619,67 @@ export class WebPM {
     packageJson: PackageJsonManifest,
     options: ResolvePackageJsonOptions = {}
   ): Promise<FetchedDependencyTree[]> {
-    logger.info('Resolving and fetching package.json dependencies', { 
-      packageName: packageJson.name, 
-      options 
-    })
-
-    try {
-      // Create registry instance
-      const registry = new NPMRegistry({
-        url: this.config.registry,
-        timeout: this.config.timeout,
-        maxRetries: this.config.retries,
+    return this._wrapBusy(async () => {
+      logger.info('Resolving and fetching package.json dependencies', {
+        packageName: packageJson.name,
+        options
       })
 
-      // Extract wanted dependencies from package.json
-      const wantedDependencies = getWantedDependenciesFromPackageJson(packageJson, options)
-      
-      if (wantedDependencies.length === 0) {
-        logger.info('No dependencies found in package.json')
-        return []
-      }
+      try {
+        // Create registry instance
+        const registry = new NPMRegistry({
+          url: this.config.registry,
+          timeout: this.config.timeout,
+          maxRetries: this.config.retries,
+        })
 
-      logger.info(`Found ${wantedDependencies.length} dependencies to resolve:`)
-      for (const dep of wantedDependencies) {
-        const depType = dep.dev ? 'dev' : (dep.optional ? 'optional' : 'prod')
-        logger.info(`  ${depType}: ${dep.alias}@${dep.bareSpecifier}`)
-      }
+        // Extract wanted dependencies from package.json
+        const wantedDependencies = getWantedDependenciesFromPackageJson(packageJson, options)
 
-      // Resolve and fetch all wanted dependencies
-      const results = await resolveAndFetchWantedDependencies(
-        wantedDependencies,
-        registry,
-        {
-          maxConcurrent: options.maxConcurrent || this.config.concurrency
+        if (wantedDependencies.length === 0) {
+          logger.info('No dependencies found in package.json')
+          return []
         }
-      )
 
-      // Calculate summary statistics
-      const totalPackages = results.reduce((sum, result) => sum + result.totalPackages, 0)
-      const totalFiles = results.reduce((sum, result) => sum + result.totalFiles, 0)
-      const totalTime = results.reduce((max, result) => Math.max(max, result.timings.totalTime), 0)
+        logger.info(`Found ${wantedDependencies.length} dependencies to resolve:`)
+        for (const dep of wantedDependencies) {
+          const depType = dep.dev ? 'dev' : (dep.optional ? 'optional' : 'prod')
+          logger.info(`  ${depType}: ${dep.alias}@${dep.bareSpecifier}`)
+        }
 
-      logger.info(`Successfully resolved and fetched package.json dependencies:`)
-      logger.info(`  Root dependencies resolved: ${results.length}`)
-      logger.info(`  Total packages: ${totalPackages}`)
-      logger.info(`  Total files: ${totalFiles}`)
-      logger.info(`  Total time: ${totalTime.toFixed(2)}ms`)
+        // Resolve and fetch all wanted dependencies
+        const results = await resolveAndFetchWantedDependencies(
+          wantedDependencies,
+          registry,
+          {
+            maxConcurrent: options.maxConcurrent || this.config.concurrency,
+            autoInstallPeers: options.autoInstallPeers
+          }
+        )
 
-      // Log per-dependency summary
-      for (const result of results) {
-        logger.info(`  ${result.root.package.name}@${result.root.package.version}: ${result.totalPackages} packages, ${result.totalFiles} files`)
+        // Calculate summary statistics
+        const totalPackages = results.reduce((sum, result) => sum + result.totalPackages, 0)
+        const totalFiles = results.reduce((sum, result) => sum + result.totalFiles, 0)
+        const totalTime = results.reduce((max, result) => Math.max(max, result.timings.totalTime), 0)
+
+        logger.info(`Successfully resolved and fetched package.json dependencies:`)
+        logger.info(`  Root dependencies resolved: ${results.length}`)
+        logger.info(`  Total packages: ${totalPackages}`)
+        logger.info(`  Total files: ${totalFiles}`)
+        logger.info(`  Total time: ${totalTime.toFixed(2)}ms`)
+
+        // Log per-dependency summary
+        for (const result of results) {
+          logger.info(`  ${result.root.package.name}@${result.root.package.version}: ${result.totalPackages} packages, ${result.totalFiles} files`)
+        }
+
+        return results
+
+      } catch (error) {
+        logger.error(`Failed to resolve and fetch package.json dependencies:`, error)
+        throw error
       }
-
-      return results
-
-    } catch (error) {
-      logger.error(`Failed to resolve and fetch package.json dependencies:`, error)
-      throw error
-    }
+    })
   }
 
   /**
@@ -645,9 +689,9 @@ export class WebPM {
     const indent = '  '.repeat(depth)
     const { name, version } = node.package
     const childCount = node.children.size
-    
+
     logger.info(`${indent}${name}@${version} (${childCount} dependencies)`)
-    
+
     // Log children
     for (const [, childNode] of node.children) {
       this.logDependencyTree(childNode, depth + 1)
@@ -673,8 +717,10 @@ export class WebPM {
   async getMultiplePackages(
     packageNames: string[]
   ): Promise<PackageMetadata[]> {
-    const promises = packageNames.map((name) => this.getPackageInfo(name))
-    return Promise.all(promises)
+    return this._wrapBusy(() => {
+      const promises = packageNames.map((name) => this.getPackageInfo(name))
+      return Promise.all(promises)
+    })
   }
 
   /**
@@ -744,6 +790,7 @@ export class WebPM {
    * @returns Promise resolving to Response
    */
   private async fetchWithRetry(url: string): Promise<Response> {
+    // This function itself may be called inside _wrapBusy, but never hurts to play nice
     let lastError: Error
 
     for (let attempt = 1; attempt <= this.config.retries; attempt++) {

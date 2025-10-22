@@ -306,13 +306,15 @@ export async function pickPackage(
       if (!opts.dryRun) {
         // We stringify this meta here to avoid saving any mutations that could happen to the meta object.
         const stringifiedMeta = JSON.stringify(meta)
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+         
+        // TODO: what is this floating async promise used for?
+        // Need to investigate and understand what the flow should be.
         runLimited(pkgMirror, (limit) =>
           limit(async () => {
             try {
               await saveMeta(pkgMirror, stringifiedMeta)
             } catch (err: any) {
-              // eslint-disable-line
+               
               // We don't care if this file was not written to the cache
             }
           })
@@ -328,7 +330,7 @@ export async function pickPackage(
         ),
       }
     } catch (err: any) {
-      // eslint-disable-line
+       
       err.spec = spec
       const meta = await loadMeta(pkgMirror) // TODO: add test for this usecase
       if (meta == null) throw err
@@ -397,7 +399,7 @@ async function loadMeta(pkgMirror: string): Promise<PackageMeta | null> {
   try {
     return await loadJsonFile<PackageMeta>(pkgMirror)
   } catch (err: any) {
-    // eslint-disable-line
+     
     return null
   }
 }

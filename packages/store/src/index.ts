@@ -58,19 +58,19 @@ export class FileContentStore {
   async init(): Promise<void> {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.dbVersion)
-      
+
       request.onerror = () => reject(request.error)
       request.onsuccess = () => {
         this.db = request.result
         resolve()
       }
-      
+
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
-        
+
         if (!db.objectStoreNames.contains(this.storeName)) {
           const store = db.createObjectStore(this.storeName, { keyPath: 'id' })
-          
+
           // Create indexes for efficient querying
           store.createIndex('packageName', 'packageName', { unique: false })
           store.createIndex('packageVersion', 'packageVersion', { unique: false })
@@ -83,12 +83,12 @@ export class FileContentStore {
 
   async storeFileContent(fileContent: StoredFileContent): Promise<void> {
     if (!this.db) await this.init()
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite')
       const store = transaction.objectStore(this.storeName)
       const request = store.put(fileContent)
-      
+
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve()
     })
@@ -96,12 +96,12 @@ export class FileContentStore {
 
   async getFileContent(id: string): Promise<StoredFileContent | null> {
     if (!this.db) await this.init()
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readonly')
       const store = transaction.objectStore(this.storeName)
       const request = store.get(id)
-      
+
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve(request.result || null)
     })
@@ -109,21 +109,21 @@ export class FileContentStore {
 
   async getPackageFiles(packageName: string, packageVersion?: string): Promise<StoredFileContent[]> {
     if (!this.db) await this.init()
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readonly')
       const store = transaction.objectStore(this.storeName)
       const index = store.index('packageName')
       const request = index.getAll(packageName)
-      
+
       request.onerror = () => reject(request.error)
       request.onsuccess = () => {
         let results = request.result
-        
+
         if (packageVersion) {
           results = results.filter(file => file.packageVersion === packageVersion)
         }
-        
+
         resolve(results)
       }
     })
@@ -131,21 +131,21 @@ export class FileContentStore {
 
   async clearPackageFiles(packageName: string, packageVersion?: string): Promise<void> {
     if (!this.db) await this.init()
-    
+
     const filesToDelete = await this.getPackageFiles(packageName, packageVersion)
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite')
       const store = transaction.objectStore(this.storeName)
-      
+
       let completed = 0
       const total = filesToDelete.length
-      
+
       if (total === 0) {
         resolve()
         return
       }
-      
+
       for (const file of filesToDelete) {
         const request = store.delete(file.id)
         request.onerror = () => reject(request.error)
@@ -159,12 +159,12 @@ export class FileContentStore {
 
   async clearAll(): Promise<void> {
     if (!this.db) await this.init()
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite')
       const store = transaction.objectStore(this.storeName)
       const request = store.clear()
-      
+
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve()
     })
@@ -172,12 +172,12 @@ export class FileContentStore {
 
   async getAllFiles(): Promise<StoredFileContent[]> {
     if (!this.db) await this.init()
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readonly')
       const store = transaction.objectStore(this.storeName)
       const request = store.getAll()
-      
+
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve(request.result || [])
     })
@@ -185,13 +185,13 @@ export class FileContentStore {
 
   async getFilesByType(contentType: string): Promise<StoredFileContent[]> {
     if (!this.db) await this.init()
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readonly')
       const store = transaction.objectStore(this.storeName)
       const index = store.index('contentType')
       const request = index.getAll(contentType)
-      
+
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve(request.result || [])
     })
@@ -199,7 +199,7 @@ export class FileContentStore {
 
   async getTypeScriptFiles(): Promise<StoredFileContent[]> {
     const allFiles = await this.getAllFiles()
-    return allFiles.filter(file => 
+    return allFiles.filter(file =>
       file.contentType === 'application/typescript' ||
       file.filePath.endsWith('.ts') ||
       file.filePath.endsWith('.tsx') ||
@@ -209,7 +209,7 @@ export class FileContentStore {
 
   async getJavaScriptFiles(): Promise<StoredFileContent[]> {
     const allFiles = await this.getAllFiles()
-    return allFiles.filter(file => 
+    return allFiles.filter(file =>
       file.contentType === 'application/javascript' ||
       file.filePath.endsWith('.js') ||
       file.filePath.endsWith('.jsx') ||
@@ -227,7 +227,7 @@ export const fileContentStore = new FileContentStore()
  */
 function getContentType(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase()
-  
+
   switch (ext) {
     case 'js':
     case 'mjs':
@@ -263,19 +263,18 @@ function getContentType(filePath: string): string {
  * Helper function to check if a file should be stored (text files only)
  */
 function shouldStoreFile(filePath: string, size: number): boolean {
-  // Skip very large files (>1MB)
-  if (size > 1024 * 1024) return false
-  
+  return true
   const ext = filePath.split('.').pop()?.toLowerCase()
   const textExtensions = [
     'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx',
+    'mts', 'cts', 'json5', 'toml',
     'json', 'css', 'scss', 'sass', 'less',
     'html', 'htm', 'xml', 'svg',
     'md', 'txt', 'yml', 'yaml',
     'vue', 'svelte',
     'd.ts', 'map'
   ]
-  
+
   return textExtensions.includes(ext || '')
 }
 
@@ -286,10 +285,10 @@ async function storeExtractedFiles(fetchedPackage: FetchedPackage): Promise<void
   try {
     const packageName = fetchedPackage.package.name
     const packageVersion = fetchedPackage.package.version
-    
+
     for (const file of fetchedPackage.extractedFiles.files) {
       if (!shouldStoreFile(file.name, file.size)) continue
-      
+
       try {
         const content = file.buffer.toString('utf-8')
         const fileContent: StoredFileContent = {
@@ -302,14 +301,14 @@ async function storeExtractedFiles(fetchedPackage: FetchedPackage): Promise<void
           mtime: file.mtime,
           contentType: getContentType(file.name)
         }
-        
+
         await fileContentStore.storeFileContent(fileContent)
       } catch {
         // Skip files that can't be converted to UTF-8
         logger.debug(`Skipping non-text file: ${file.name}`)
       }
     }
-    
+
     logger.debug(`Stored file contents for ${packageName}@${packageVersion}`)
   } catch (error) {
     logger.warn(`Failed to store file contents for ${fetchedPackage.package.id}:`, error)
@@ -401,6 +400,7 @@ export interface ResolutionContext {
   maxDepth: number
   currentDepth: number
   parentIds: string[]
+  autoInstallPeers?: boolean
   onResult?: (result: FetchedDependencyTree) => void
 }
 
@@ -410,6 +410,7 @@ export interface RequestPackageOptions {
   maxDepth?: number
   preferWorkspacePackages?: boolean
   updateToLatest?: boolean
+  autoInstallPeers?: boolean
   onResult?: (result: FetchedPackage) => void
 }
 
@@ -449,7 +450,7 @@ export async function requestPackage(
 
     // Fetch package metadata from registry
     const packageVersions = await registry.getPackageVersions(alias)
-    
+
     if (!packageVersions) {
       logger.error(`Package ${alias} not found in registry`)
       return null
@@ -457,7 +458,7 @@ export async function requestPackage(
 
     // Resolve the specific version based on the bare specifier
     const resolvedVersion = resolveVersion(bareSpecifier, packageVersions)
-    
+
     if (!resolvedVersion) {
       logger.error(`No version found for ${alias}@${bareSpecifier}`)
       return null
@@ -465,7 +466,7 @@ export async function requestPackage(
 
     // Get the specific version metadata
     const versionMetadata = packageVersions.versions[resolvedVersion]
-    
+
     if (!versionMetadata) {
       logger.error(`Version ${resolvedVersion} not found for package ${alias}`)
       return null
@@ -491,7 +492,7 @@ export async function requestPackage(
 
     // Cache the resolved package
     resolvedPackages.set(alias, resolvedPackage)
-    
+
     logger.info(`Resolved package: ${resolvedPackage.id}`)
     return resolvedPackage
 
@@ -504,7 +505,11 @@ export async function requestPackage(
 /**
  * Extract non-dev dependencies from a package manifest
  */
-export function getNonDevWantedDependencies(packageManifest: PackageMetadata): WantedDependency[] {
+export function getNonDevWantedDependencies(
+  packageManifest: PackageMetadata,
+  options: { autoInstallPeers?: boolean } = {}
+): WantedDependency[] {
+  const { autoInstallPeers = false } = options
   const dependencies: WantedDependency[] = []
 
   // Add regular dependencies
@@ -529,6 +534,29 @@ export function getNonDevWantedDependencies(packageManifest: PackageMetadata): W
         optional: true,
       })
     }
+  }
+
+  // Auto-install peers if requested
+  if (autoInstallPeers && packageManifest.peerDependencies) {
+    logger.info(`🔍 Auto-installing peers for ${packageManifest.name}:`, Object.keys(packageManifest.peerDependencies))
+    for (const [alias, bareSpecifier] of Object.entries(packageManifest.peerDependencies)) {
+      // Only add if not already in dependencies
+      if (!packageManifest.dependencies?.[alias] && !dependencies.some(dep => dep.alias === alias)) {
+        logger.info(`➕ Adding peer dependency: ${alias}@${bareSpecifier}`)
+        dependencies.push({
+          alias,
+          bareSpecifier: String(bareSpecifier),
+          dev: false,
+          optional: false,
+        })
+      } else {
+        logger.info(`⏭️  Skipping peer dependency ${alias} (already exists)`)
+      }
+    }
+  } else if (autoInstallPeers) {
+    logger.info(`🔍 Auto-install peers requested but no peer dependencies found for ${packageManifest.name}`)
+  } else {
+    logger.info(`🔍 Auto-install peers not requested for ${packageManifest.name}`)
   }
 
   return dependencies
@@ -626,7 +654,7 @@ export function getWantedDependenciesFromPackageJson(
  */
 function resolveVersion(bareSpecifier: string, packageVersions: PackageVersions): string | null {
   const availableVersions = Object.keys(packageVersions.versions)
-  
+
   // Handle special cases
   if (bareSpecifier === 'latest') {
     return packageVersions['dist-tags'].latest
@@ -702,8 +730,12 @@ export async function resolveDependencies(
     dependencyTree.set(nodeId, node)
 
     // Get dependencies to resolve
-    const wantedDependencies = getNonDevWantedDependencies(resolvedPackage.manifest)
-    
+    logger.info(`🔍 Resolving dependencies for ${packageName}@${packageVersion} with autoInstallPeers: ${context.autoInstallPeers}`)
+    const wantedDependencies = getNonDevWantedDependencies(resolvedPackage.manifest, {
+      autoInstallPeers: context.autoInstallPeers
+    })
+    logger.info(`🔍 Found ${wantedDependencies.length} dependencies to resolve for ${packageName}@${packageVersion}`)
+
     logger.info(`Resolving ${wantedDependencies.length} dependencies for ${packageName}@${packageVersion}`)
 
     // Resolve each dependency
@@ -739,7 +771,7 @@ export async function resolveDependencies(
 
     // Wait for all child dependencies to resolve
     const childResults = await Promise.all(childPromises)
-    
+
     // Add resolved children to the node
     for (const result of childResults) {
       if (result && result.node) {
@@ -759,7 +791,12 @@ export async function resolveDependencies(
 /**
  * Create a new resolution context
  */
-export function createResolutionContext(registry: NPMRegistry, maxDepth = 16): ResolutionContext {
+export function createResolutionContext(
+  registry: NPMRegistry,
+  maxDepth = 16,
+  autoInstallPeers = false
+): ResolutionContext {
+  console.log(`🔍 Creating resolution context with autoInstallPeers: ${autoInstallPeers}`)
   return {
     registry,
     resolvedPackages: new Map(),
@@ -767,6 +804,7 @@ export function createResolutionContext(registry: NPMRegistry, maxDepth = 16): R
     maxDepth,
     currentDepth: 0,
     parentIds: [],
+    autoInstallPeers,
   }
 }
 
@@ -779,8 +817,8 @@ export async function resolvePackageTree(
   registry: NPMRegistry,
   options: RequestPackageOptions = {}
 ): Promise<DependencyTreeNode | null> {
-  const context = createResolutionContext(registry, options.maxDepth)
-  
+  const context = createResolutionContext(registry, options.maxDepth, options.autoInstallPeers)
+
   // First, request the root package
   const rootPackage = await requestPackage(
     {
@@ -835,10 +873,30 @@ export async function fetchDependencyTree(
     // Phase 1: Collect packages to fetch
     const collectTimer = new Timer();
     const packagesToFetch: ResolvedPackage[] = [];
-    const collectPackages = (node: DependencyTreeNode) => {
+    const visitedPackages = new Set<string>();
+
+    const collectPackages = (node: DependencyTreeNode, parentIds: string[] = []) => {
+      const packageId = `${node.package.name}@${node.package.version}`;
+
+      // Check for circular dependencies
+      if (parentIds.includes(node.package.name)) {
+        logger.warn(`Circular dependency detected for package ${node.package.name} in collectPackages`);
+        return;
+      }
+
+      // Avoid processing the same package multiple times
+      if (visitedPackages.has(packageId)) {
+        return;
+      }
+
       packagesToFetch.push(node.package);
+      visitedPackages.add(packageId);
+
+      // Create new parent chain for children
+      const newParentIds = [...parentIds, node.package.name];
+
       for (const childNode of node.children.values()) {
-        collectPackages(childNode);
+        collectPackages(childNode, newParentIds);
       }
     };
     collectPackages(dependencyTree);
@@ -857,20 +915,20 @@ export async function fetchDependencyTree(
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
       const batchTimer = new Timer();
-      
+
       const batchPromises = batch.map(async (pkg) => {
         const packageTimer = new Timer();
         const fetched = await tarballFetcher.fetchPackage(pkg);
         const packageTime = packageTimer.stop();
-        
+
         if (fetched) {
           options.onResult?.(fetched);
           allFetchedPackages.set(pkg.id, fetched);
           totalFiles += fetched.extractedFiles.files.length;
-          
+
           // Store file contents in IndexedDB
           await storeExtractedFiles(fetched);
-          
+
           logger.debug(`Fetched ${pkg.id} in ${packageTime.toFixed(2)}ms`);
         }
         return fetched;
@@ -886,13 +944,34 @@ export async function fetchDependencyTree(
 
     // Phase 3: Update tree with fetched packages
     const updateTimer = new Timer();
-    const updateTreeWithFetched = (node: DependencyTreeNode) => {
+    const visitedNodes = new Set<string>();
+
+    const updateTreeWithFetched = (node: DependencyTreeNode, parentIds: string[] = []) => {
+      const nodeId = `${node.package.name}@${node.package.version}`;
+
+      // Check for circular dependencies
+      if (parentIds.includes(node.package.name)) {
+        logger.warn(`Circular dependency detected for package ${node.package.name} in updateTreeWithFetched`);
+        return;
+      }
+
+      // Avoid processing the same node multiple times
+      if (visitedNodes.has(nodeId)) {
+        return;
+      }
+
+      visitedNodes.add(nodeId);
+
       const fetched = allFetchedPackages.get(node.package.id);
       if (fetched) {
         node.fetched = fetched;
       }
+
+      // Create new parent chain for children
+      const newParentIds = [...parentIds, node.package.name];
+
       for (const childNode of node.children.values()) {
-        updateTreeWithFetched(childNode);
+        updateTreeWithFetched(childNode, newParentIds);
       }
     };
     updateTreeWithFetched(dependencyTree);
@@ -933,16 +1012,16 @@ export async function fetchDependencyTree(
 export async function resolveAndFetchWantedDependencies(
   wantedDependencies: WantedDependency[],
   registry: NPMRegistry,
-  options: { maxConcurrent?: number, onResult?: (result: FetchedDependencyTree) => void } = {}
+  options: { maxConcurrent?: number, autoInstallPeers?: boolean, onResult?: (result: FetchedDependencyTree) => void } = {}
 ): Promise<FetchedDependencyTree[]> {
-  const { maxConcurrent = 5, onResult } = options
-  
+  const { maxConcurrent = 5, autoInstallPeers = false, onResult } = options
+
   logger.info(`Resolving ${wantedDependencies.length} wanted dependencies`)
 
   // Process packages in batches to control concurrency
   const results: FetchedDependencyTree[] = []
   const batches: WantedDependency[][] = []
-  
+
   for (let i = 0; i < wantedDependencies.length; i += maxConcurrent) {
     batches.push(wantedDependencies.slice(i, i + maxConcurrent))
   }
@@ -952,25 +1031,26 @@ export async function resolveAndFetchWantedDependencies(
       try {
         const depType = wantedDep.dev ? 'dev' : (wantedDep.optional ? 'optional' : 'prod')
         logger.info(`Resolving ${depType} dependency: ${wantedDep.alias}@${wantedDep.bareSpecifier}`)
-        
+
         const result = await resolveAndFetchPackage(
-          wantedDep.alias, 
-          wantedDep.bareSpecifier, 
-          registry, 
+          wantedDep.alias,
+          wantedDep.bareSpecifier,
+          registry,
           {
-            maxConcurrent
+            maxConcurrent,
+            autoInstallPeers
             // Don't pass onResult here, we'll call it after each result
           }
         )
-        
+
         if (result) {
           logger.info(`Successfully resolved ${wantedDep.alias}@${wantedDep.bareSpecifier} with ${result.totalPackages} packages`)
-          
+
           // Call the onResult callback with the fetched tree
           if (onResult) {
             onResult(result)
           }
-          
+
           return result
         } else {
           logger.warn(`Failed to resolve ${wantedDep.alias}@${wantedDep.bareSpecifier}`)
@@ -1008,6 +1088,7 @@ export async function resolveAndFetchPackage(
   const timings = createTimings();
 
   try {
+    console.log(`🔍 resolveAndFetchPackage: autoInstallPeers = ${options.autoInstallPeers}`)
     logger.info(`Resolving and fetching package: ${packageName}@${packageVersion}`);
 
     // Phase 1: Resolve the dependency tree
@@ -1015,7 +1096,7 @@ export async function resolveAndFetchPackage(
     const dependencyTree = await resolvePackageTree(packageName, packageVersion, registry, options);
     timings.resolutionTime = resolutionTimer.stop();
     timings.phases.dependencyResolution = timings.resolutionTime;
-    
+
     if (!dependencyTree) {
       logger.error(`Failed to resolve dependency tree for ${packageName}@${packageVersion}`);
       return null;
@@ -1024,11 +1105,11 @@ export async function resolveAndFetchPackage(
     logger.info(`Dependency resolution completed in ${timings.resolutionTime.toFixed(2)}ms`);
 
     // Phase 2: Fetch all packages
-    const fetchedTree = await fetchDependencyTree(dependencyTree, { 
-      maxConcurrent: options.maxConcurrent 
+    const fetchedTree = await fetchDependencyTree(dependencyTree, {
+      maxConcurrent: options.maxConcurrent
       // Don't pass onResult here, we'll call it after the tree is complete
     });
-    
+
     if (!fetchedTree) {
       logger.error(`Failed to fetch packages for ${packageName}@${packageVersion}`);
       return null;
